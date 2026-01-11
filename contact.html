@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Student Details</title>
+
+<style>
+body{
+    font-family: Arial;
+    background:#eef2f3;
+    text-align:center;
+    padding-top:30px;
+}
+
+.box{
+    background:white;
+    width:700px;
+    margin:auto;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 0 12px #999;
+}
+
+.bar{
+    background:#cfe2f3;
+    padding:12px;
+    margin:8px;
+    cursor:pointer;
+    border-radius:6px;
+    font-size:17px;
+}
+
+.student{
+    background:#f1f1f1;
+    padding:6px;
+    margin:5px auto;
+    width:70%;
+    border-radius:4px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.admin{
+    background:#990000;
+    color:white;
+    border:none;
+    padding:8px 15px;
+    border-radius:5px;
+    cursor:pointer;
+}
+
+input{
+    padding:7px;
+    width:60%;
+    margin:5px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+    <h2>Student Details (Class Wise)</h2>
+
+    <!-- Class Bars -->
+    <div class="bar" onclick="showClass(1)">1st Class</div>
+    <div class="bar" onclick="showClass(2)">2nd Class</div>
+    <div class="bar" onclick="showClass(3)">3rd Class</div>
+    <div class="bar" onclick="showClass(4)">4th Class</div>
+    <div class="bar" onclick="showClass(5)">5th Class</div>
+    <div class="bar" onclick="showClass(6)">6th Class</div>
+    <div class="bar" onclick="showClass(7)">7th Class</div>
+    <div class="bar" onclick="showClass(8)">8th Class</div>
+    <div class="bar" onclick="showClass(9)">9th Class</div>
+    <div class="bar" onclick="showClass(10)">10th Class</div>
+
+    <div id="list"></div>
+
+    <br>
+    <button class="admin" onclick="showLogin()">Admin Login</button>
+</div>
+
+<!-- Admin Login Box -->
+<div class="box" id="loginBox" style="display:none;">
+    <h3>Admin Login</h3>
+    <input id="user" placeholder="Username">
+    <input id="pass" type="password" placeholder="Password">
+    <br>
+    <button class="admin" onclick="login()">Login</button>
+    <p id="msg" style="color:red;"></p>
+</div>
+
+<script>
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "rbs123";
+let isAdmin = false;
+
+/* Student Data */
+const data = {
+  1:["Arjun","Sai"],
+  2:["Ravi"],
+  3:["Kiran"],
+  4:["Anu"],
+  5:["Vikram"],
+  6:["Manoj"],
+  7:["Suresh"],
+  8:["Lakshmi"],
+  9:["Charan"],
+  10:["Kishore","Anjali"]
+};
+
+function showClass(cls){
+    let suffix = cls==1?"st":cls==2?"nd":cls==3?"rd":"th";
+    let html = `<h3>${cls}${suffix} Class Students</h3>`;
+
+    data[cls].forEach((s,i)=>{
+        html += `
+        <div class="student">
+            ${s}
+            ${isAdmin ? `<button onclick="removeStudent(${cls},${i})">❌</button>` : ``}
+        </div>`;
+    });
+
+    if(isAdmin){
+        html += `
+        <input id="newName" placeholder="Add student name">
+        <button class="admin" onclick="addStudent(${cls})">Add</button>
+        `;
+    }
+
+    list.innerHTML = html;
+}
+
+function showLogin(){
+    loginBox.style.display="block";
+}
+
+function login(){
+    if(user.value===ADMIN_USER && pass.value===ADMIN_PASS){
+        isAdmin = true;
+        loginBox.style.display="none";
+        alert("Admin Logged In");
+    }else{
+        msg.innerText="Invalid username or password";
+    }
+}
+
+function addStudent(cls){
+    if(newName.value.trim()!==""){
+        data[cls].push(newName.value.trim());
+        showClass(cls);
+    }
+}
+
+function removeStudent(cls,index){
+    data[cls].splice(index,1);
+    showClass(cls);
+}
+</script>
+
+</body>
+</html>
