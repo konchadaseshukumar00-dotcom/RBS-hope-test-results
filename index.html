@@ -16,13 +16,15 @@
         background: #0b5394;
         color: white;
         padding: 20px;
-        border-radius: 10px 10px 0 0;
+        border-radius: 10px;
+        width: 600px;
+        margin: auto;
+        cursor: pointer;
     }
 
     .header h1 {
         margin: 0;
         font-size: 30px;
-        letter-spacing: 1px;
     }
 
     .header h3 {
@@ -35,8 +37,9 @@
         width: 600px;
         margin: auto;
         padding: 20px;
-        border-radius: 0 0 10px 10px;
+        border-radius: 10px;
         box-shadow: 0 0 12px #999;
+        display: none;   /* 🔴 Hidden initially */
     }
 
     input, button {
@@ -91,12 +94,15 @@
 
 <body>
 
-<div class="header">
+<!-- 🔵 Clickable Title -->
+<div class="header" onclick="openResults()">
     <h1>RBS Institutions</h1>
     <h3>10th Class HOPE Test Results</h3>
+    <p>(Click here to view results)</p>
 </div>
 
-<div class="box">
+<!-- 🔴 Result Section (Hidden First) -->
+<div class="box" id="resultBox">
 
     <input type="text" id="roll" placeholder="Enter Roll Number">
     <br>
@@ -108,31 +114,26 @@
 
 <script>
 const students = {
-  "RBS00001": {name:"M.Kishore",   marks:[78,65,82,70,69,74,20]},
-  "RBS00002": {name:"K.Nanda Kishore",   marks:[60,55,48,62,59,64,30]},
-  "RBS00003": {name:"P.Charan",  marks:[30,42,38,50,45,40,26]},
-  "RBS00004": {name:"A.Siddartha",   marks:[88,90,92,85,87,89,45]},
-  "RBS00005": {name:"T.Vikash",   marks:[66,61,59,63,60,65,28]},
-  "RBS00006": {name:"Y.Mahesh",   marks:[95,91,93,90,92,94,48]},
-  "RBS00007": {name:"A.Likitha",  marks:[35,40,45,38,42,39,27]},
-  "RBS00008": {name:"M.Usha",  marks:[98,97,96,95,94,93,49]},
-  "RBS00009": {name:"Ch.Anjali",   marks:[28,32,30,25,40,45,20]},
-  "RBS00010": {name:"K.Mythri",  marks:[70,72,75,74,73,71,32]},
-  "RBS00011": {name:"B.Vyshnavi",   marks:[45,48,50,46,44,47,29]},
+  "RBS00001": {name:"M.Kishore", marks:[78,65,82,70,69,74,20]},
+  "RBS00002": {name:"K.Nanda Kishore", marks:[60,55,48,62,59,64,30]},
+  "RBS00003": {name:"P.Charan", marks:[30,42,38,50,45,40,26]},
+  "RBS00004": {name:"A.Siddartha", marks:[88,90,92,85,87,89,45]},
+  "RBS00005": {name:"T.Vikash", marks:[66,61,59,63,60,65,28]},
+  "RBS00006": {name:"Y.Mahesh", marks:[95,91,93,90,92,94,48]},
+  "RBS00007": {name:"A.Likitha", marks:[35,40,45,38,42,39,27]},
+  "RBS00008": {name:"M.Usha", marks:[98,97,96,95,94,93,49]},
+  "RBS00009": {name:"Ch.Anjali", marks:[28,32,30,25,40,45,20]},
+  "RBS00010": {name:"K.Mythri", marks:[70,72,75,74,73,71,32]},
+  "RBS00011": {name:"B.Vyshnavi", marks:[45,48,50,46,44,47,29]},
   "RBS00012": {name:"K.Venkata Sai", marks:[85,82,88,86,84,83,44]}
 };
 
-const subjects = [
-  "Telugu",
-  "Hindi",
-  "English",
-  "Mathematics",
-  "Science",
-  "Social",
-  "Computer"
-];
+const subjects = ["Telugu","Hindi","English","Mathematics","Science","Social","Computer"];
+const passMarks = [35,35,35,35,35,35,25];
 
-const passMarks = [35, 35, 35, 35, 35, 35, 25];
+function openResults() {
+    document.getElementById("resultBox").style.display = "block";
+}
 
 function getResult() {
     let roll = document.getElementById("roll").value.trim();
@@ -147,27 +148,27 @@ function getResult() {
     let finalResult = "PASS";
     let total = 0;
 
-    let html = "<h3>Name: " + s.name + "</h3>";
-    html += "<h4>Roll Number: " + roll + "</h4>";
-    html += "<table>";
-    html += "<tr><th>Subject</th><th>Marks</th><th>Status</th></tr>";
+    let html = `<h3>Name: ${s.name}</h3>
+                <h4>Roll Number: ${roll}</h4>
+                <table>
+                <tr><th>Subject</th><th>Marks</th><th>Status</th></tr>`;
 
     for (let i = 0; i < subjects.length; i++) {
         let status = s.marks[i] >= passMarks[i] ? "PASS" : "FAIL";
         if (status === "FAIL") finalResult = "FAIL";
         total += s.marks[i];
 
-        html += "<tr>";
-        html += "<td>" + subjects[i] + "</td>";
-        html += "<td>" + s.marks[i] + "</td>";
-        html += "<td class='" + (status === "PASS" ? "pass" : "fail") + "'>" + status + "</td>";
-        html += "</tr>";
+        html += `<tr>
+                    <td>${subjects[i]}</td>
+                    <td>${s.marks[i]}</td>
+                    <td class="${status === "PASS" ? "pass" : "fail"}">${status}</td>
+                 </tr>`;
     }
 
-    html += "</table>";
-    html += "<h3>Total Marks: " + total + " / 600</h3>";
-    html += "<h3 class='" + (finalResult === "PASS" ? "pass" : "fail") + "'>";
-    html += "FINAL RESULT: " + finalResult + "</h3>";
+    html += `</table>
+             <h3>Total Marks: ${total}</h3>
+             <h3 class="${finalResult === "PASS" ? "pass" : "fail"}">
+             FINAL RESULT: ${finalResult}</h3>`;
 
     out.innerHTML = html;
 }
@@ -175,6 +176,3 @@ function getResult() {
 
 </body>
 </html>
-
-
-
