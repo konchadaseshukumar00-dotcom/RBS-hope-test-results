@@ -12,14 +12,14 @@
         padding-top: 30px;
     }
 
+    /* 🔵 HEADER (Always Visible) */
     .header {
         background: #0b5394;
         color: white;
         padding: 20px;
-        border-radius: 10px;
         width: 600px;
         margin: auto;
-        cursor: pointer;
+        border-radius: 10px;
     }
 
     .header h1 {
@@ -32,6 +32,25 @@
         font-weight: normal;
     }
 
+    /* 🔹 Button / Title */
+    .open-btn {
+        margin: 20px auto;
+        padding: 15px;
+        width: 600px;
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 0 8px #999;
+        font-size: 20px;
+        cursor: pointer;
+        color: #0b5394;
+        font-weight: bold;
+    }
+
+    .open-btn:hover {
+        background: #d9ead3;
+    }
+
+    /* 🔴 Result Box (Hidden First) */
     .box {
         background: white;
         width: 600px;
@@ -39,7 +58,7 @@
         padding: 20px;
         border-radius: 10px;
         box-shadow: 0 0 12px #999;
-        display: none;   /* 🔴 Hidden initially */
+        display: none;
     }
 
     input, button {
@@ -94,14 +113,18 @@
 
 <body>
 
-<!-- 🔵 Clickable Title -->
-<div class="header" onclick="openResults()">
+<!-- 🔵 HEADER -->
+<div class="header">
     <h1>RBS Institutions</h1>
     <h3>10th Class HOPE Test Results</h3>
-    <p>(Click here to view results)</p>
 </div>
 
-<!-- 🔴 Result Section (Hidden First) -->
+<!-- 🔹 CLICK TO OPEN -->
+<div class="open-btn" onclick="openResults()">
+    Click Here to View HOPE Test Results
+</div>
+
+<!-- 🔴 RESULT BAR -->
 <div class="box" id="resultBox">
 
     <input type="text" id="roll" placeholder="Enter Roll Number">
