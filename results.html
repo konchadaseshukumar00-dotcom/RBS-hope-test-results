@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RBS Institutions - HOPE Test Results</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #eef2f3;
+        text-align: center;
+        padding-top: 30px;
+    }
+
+    .header {
+        background: #0b5394;
+        color: white;
+        padding: 20px;
+        border-radius: 10px 10px 0 0;
+    }
+
+    .header h1 {
+        margin: 0;
+        font-size: 30px;
+        letter-spacing: 1px;
+    }
+
+    .header h3 {
+        margin: 5px 0 0;
+        font-weight: normal;
+    }
+
+    .box {
+        background: white;
+        width: 600px;
+        margin: auto;
+        padding: 20px;
+        border-radius: 0 0 10px 10px;
+        box-shadow: 0 0 12px #999;
+    }
+
+    input, button {
+        padding: 10px;
+        width: 80%;
+        margin: 10px;
+        font-size: 16px;
+    }
+
+    button {
+        background: #0b5394;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #073763;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    table, th, td {
+        border: 1px solid #444;
+    }
+
+    th {
+        background: #d9ead3;
+    }
+
+    th, td {
+        padding: 8px;
+        text-align: center;
+    }
+
+    .pass {
+        color: green;
+        font-weight: bold;
+    }
+
+    .fail {
+        color: red;
+        font-weight: bold;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>RBS Institutions</h1>
+    <h3>10th Class HOPE Test Results</h3>
+</div>
+
+<div class="box">
+
+    <input type="text" id="roll" placeholder="Enter Roll Number">
+    <br>
+    <button onclick="getResult()">Get Result</button>
+
+    <div id="result"></div>
+
+</div>
+
+<script>
+const students = {
+  "10A01": {name:"Akhil",   marks:[78,65,82,70,69,74,20]},
+  "10A02": {name:"Bhanu",   marks:[60,55,48,62,59,64,30]},
+  "10A03": {name:"Charan",  marks:[30,42,38,50,45,40,26]},
+  "10A04": {name:"Divya",   marks:[88,90,92,85,87,89,45]},
+  "10A05": {name:"Eswar",   marks:[66,61,59,63,60,65,28]},
+  "10A06": {name:"Farha",   marks:[95,91,93,90,92,94,48]},
+  "10A07": {name:"Ganesh",  marks:[35,40,45,38,42,39,27]},
+  "10A08": {name:"Harika",  marks:[98,97,96,95,94,93,49]},
+  "10A09": {name:"Imran",   marks:[28,32,30,25,40,45,20]},
+  "10A10": {name:"Jyothi",  marks:[70,72,75,74,73,71,32]},
+  "10A11": {name:"Kiran",   marks:[45,48,50,46,44,47,29]},
+  "10A12": {name:"Lavanya", marks:[85,82,88,86,84,83,44]}
+};
+
+const subjects = [
+  "Telugu",
+  "Hindi",
+  "English",
+  "Mathematics",
+  "Science",
+  "Social",
+  "Computer"
+];
+
+const passMarks = [35, 35, 35, 35, 35, 35, 25];
+
+function getResult() {
+    let roll = document.getElementById("roll").value.trim();
+    let out = document.getElementById("result");
+
+    if (!students[roll]) {
+        out.innerHTML = "<p class='fail'>❌ Roll Number Not Found</p>";
+        return;
+    }
+
+    let s = students[roll];
+    let finalResult = "PASS";
+    let total = 0;
+
+    let html = "<h3>Name: " + s.name + "</h3>";
+    html += "<h4>Roll Number: " + roll + "</h4>";
+    html += "<table>";
+    html += "<tr><th>Subject</th><th>Marks</th><th>Status</th></tr>";
+
+    for (let i = 0; i < subjects.length; i++) {
+        let status = s.marks[i] >= passMarks[i] ? "PASS" : "FAIL";
+        if (status === "FAIL") finalResult = "FAIL";
+        total += s.marks[i];
+
+        html += "<tr>";
+        html += "<td>" + subjects[i] + "</td>";
+        html += "<td>" + s.marks[i] + "</td>";
+        html += "<td class='" + (status === "PASS" ? "pass" : "fail") + "'>" + status + "</td>";
+        html += "</tr>";
+    }
+
+    html += "</table>";
+    html += "<h3>Total Marks: " + total + " / 600</h3>";
+    html += "<h3 class='" + (finalResult === "PASS" ? "pass" : "fail") + "'>";
+    html += "FINAL RESULT: " + finalResult + "</h3>";
+
+    out.innerHTML = html;
+}
+</script>
+
+</body>
+</html>
