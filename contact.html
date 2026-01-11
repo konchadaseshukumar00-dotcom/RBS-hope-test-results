@@ -7,19 +7,36 @@
 body{
     font-family: Arial;
     background:#eef2f3;
-    text-align:center;
-    padding-top:30px;
+    padding-top:20px;
 }
 
 .box{
     background:white;
-    width:700px;
-    margin:auto;
+    width:750px;
+    margin:40px auto;
     padding:20px;
     border-radius:10px;
     box-shadow:0 0 12px #999;
+    text-align:center;
 }
 
+/* Header */
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.admin-btn{
+    background:#990000;
+    color:white;
+    border:none;
+    padding:8px 15px;
+    border-radius:5px;
+    cursor:pointer;
+}
+
+/* Class bars */
 .bar{
     background:#cfe2f3;
     padding:12px;
@@ -29,24 +46,16 @@ body{
     font-size:17px;
 }
 
+/* Student rows */
 .student{
     background:#f1f1f1;
-    padding:6px;
+    padding:6px 10px;
     margin:5px auto;
     width:70%;
     border-radius:4px;
     display:flex;
     justify-content:space-between;
     align-items:center;
-}
-
-.admin{
-    background:#990000;
-    color:white;
-    border:none;
-    padding:8px 15px;
-    border-radius:5px;
-    cursor:pointer;
 }
 
 input{
@@ -60,9 +69,19 @@ input{
 <body>
 
 <div class="box">
-    <h2>Student Details (Class Wise)</h2>
 
-    <!-- Class Bars -->
+    <!-- HEADER -->
+    <div class="header">
+        <h2>Student Details (Class Wise)</h2>
+        <button class="admin-btn" onclick="showLogin()">Admin Login</button>
+    </div>
+
+    <!-- ADMIN ONLY BAR -->
+    <div id="allBar" class="bar" onclick="showAllStudents()" style="display:none;">
+        📋 All Students (Admin Only)
+    </div>
+
+    <!-- CLASS BARS -->
     <div class="bar" onclick="showClass(1)">1st Class</div>
     <div class="bar" onclick="showClass(2)">2nd Class</div>
     <div class="bar" onclick="showClass(3)">3rd Class</div>
@@ -75,18 +94,15 @@ input{
     <div class="bar" onclick="showClass(10)">10th Class</div>
 
     <div id="list"></div>
-
-    <br>
-    <button class="admin" onclick="showLogin()">Admin Login</button>
 </div>
 
-<!-- Admin Login Box -->
+<!-- ADMIN LOGIN POPUP -->
 <div class="box" id="loginBox" style="display:none;">
     <h3>Admin Login</h3>
     <input id="user" placeholder="Username">
     <input id="pass" type="password" placeholder="Password">
     <br>
-    <button class="admin" onclick="login()">Login</button>
+    <button class="admin-btn" onclick="login()">Login</button>
     <p id="msg" style="color:red;"></p>
 </div>
 
@@ -109,9 +125,12 @@ const data = {
   10:["Kishore","Anjali"]
 };
 
+function suffix(n){
+  return n==1?"st":n==2?"nd":n==3?"rd":"th";
+}
+
 function showClass(cls){
-    let suffix = cls==1?"st":cls==2?"nd":cls==3?"rd":"th";
-    let html = `<h3>${cls}${suffix} Class Students</h3>`;
+    let html = `<h3>${cls}${suffix(cls)} Class Students</h3>`;
 
     data[cls].forEach((s,i)=>{
         html += `
@@ -124,13 +143,14 @@ function showClass(cls){
     if(isAdmin){
         html += `
         <input id="newName" placeholder="Add student name">
-        <button class="admin" onclick="addStudent(${cls})">Add</button>
+        <button class="admin-btn" onclick="addStudent(${cls})">Add</button>
         `;
     }
 
     list.innerHTML = html;
 }
 
+/* ADMIN LOGIN */
 function showLogin(){
     loginBox.style.display="block";
 }
@@ -139,12 +159,14 @@ function login(){
     if(user.value===ADMIN_USER && pass.value===ADMIN_PASS){
         isAdmin = true;
         loginBox.style.display="none";
-        alert("Admin Logged In");
+        allBar.style.display="block";
+        alert("Admin logged in successfully");
     }else{
         msg.innerText="Invalid username or password";
     }
 }
 
+/* ADD / REMOVE */
 function addStudent(cls){
     if(newName.value.trim()!==""){
         data[cls].push(newName.value.trim());
@@ -155,6 +177,20 @@ function addStudent(cls){
 function removeStudent(cls,index){
     data[cls].splice(index,1);
     showClass(cls);
+}
+
+/* ADMIN ONLY – ALL STUDENTS */
+function showAllStudents(){
+    if(!isAdmin) return;
+
+    let html = `<h3>All Students (All Classes)</h3>`;
+    for(let c in data){
+        html += `<h4>${c}${suffix(c)} Class</h4>`;
+        data[c].forEach(s=>{
+            html += `<div class="student">${s}</div>`;
+        });
+    }
+    list.innerHTML = html;
 }
 </script>
 
