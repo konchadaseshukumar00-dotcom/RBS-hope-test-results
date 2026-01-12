@@ -39,16 +39,15 @@ img{width:40px;height:50px;object-fit:cover;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getDatabase, ref, onValue, push, remove, update } 
+import { getDatabase, ref, onValue, push, remove, update }
 from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
-/* 🔹 Your Firebase Config */
+/* 🔹 Firebase Config */
 const firebaseConfig = {
  apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
  authDomain: "rbs-institutions-portal.firebaseapp.com",
  databaseURL: "https://rbs-institutions-portal-default-rtdb.firebaseio.com",
  projectId: "rbs-institutions-portal",
- storageBucket: "rbs-institutions-portal.appspot.com",
  messagingSenderId: "881467222162",
  appId: "1:881467222162:web:7acd765c4f7490ea6b9e4b"
 };
@@ -65,18 +64,30 @@ for(let i=1;i<=10;i++){
  classBars.innerHTML+=`<div class="bar" onclick="showClass(${i})">${i} Class</div>`;
 }
 
-/* Convert image file to Base64 */
+/* 📸 Convert & Resize image to Passport Size 40x50 */
 function readImage(file){
  return new Promise(resolve=>{
    const reader = new FileReader();
-   reader.onload = () => resolve(reader.result);
+   reader.onload = function(e){
+     const img = new Image();
+     img.onload = function(){
+       const canvas = document.createElement("canvas");
+       canvas.width = 40;
+       canvas.height = 50;
+       const ctx = canvas.getContext("2d");
+       ctx.drawImage(img, 0, 0, 40, 50);
+       const resized = canvas.toDataURL("image/jpeg",0.9);
+       resolve(resized);
+     }
+     img.src = e.target.result;
+   }
    reader.readAsDataURL(file);
  });
 }
 
-/* =======================
+/* ======================
    SHOW CLASS WISE
-======================= */
+====================== */
 window.showClass = function(cls){
  const classRef = ref(db,"students/"+cls);
  onValue(classRef,(snap)=>{
@@ -120,7 +131,7 @@ window.showClass = function(cls){
      html+="</table>";
    }
 
-   /* Add new student */
+   /* Add Student */
    if(isAdmin){
      html+=`<br>
       <input id="n" placeholder="Name">
@@ -137,9 +148,9 @@ window.showClass = function(cls){
  });
 }
 
-/* =======================
+/* ======================
    ADD STUDENT
-======================= */
+====================== */
 window.addStudent = async function(cls){
  let name=n.value, roll=r.value;
  let photo="";
@@ -153,53 +164,45 @@ window.addStudent = async function(cls){
  }
 }
 
-/* =======================
-   DELETE STUDENT
-======================= */
+/* ======================
+   DELETE
+====================== */
 window.delStudent = function(cls,key){
  remove(ref(db,"students/"+cls+"/"+key));
 }
 
-/* =======================
-   EDIT STUDENT + ADD PHOTO
-======================= */
+/* ======================
+   EDIT + ADD PHOTO
+====================== */
 window.editStudent = async function(cls,key,name,roll){
- let newName = prompt("Edit Name:", name);
- let newRoll = prompt("Edit Roll:", roll);
-
+ let newName = prompt("Edit Name:",name);
+ let newRoll = prompt("Edit Roll:",roll);
  if(newName===null || newRoll===null) return;
 
- let newPhoto = null;
+ let updateData = {name:newName, roll:newRoll};
 
- /* If 10th class ask for new photo */
  if(cls==10){
-   let imgInput = document.createElement("input");
+   let imgInput=document.createElement("input");
    imgInput.type="file";
    imgInput.accept="image/*";
    imgInput.click();
 
    imgInput.onchange = async ()=>{
      if(imgInput.files[0]){
-       newPhoto = await readImage(imgInput.files[0]);
+       let newPhoto = await readImage(imgInput.files[0]);
+       updateData.photo = newPhoto;
      }
-
-     let updateData = {name:newName, roll:newRoll};
-     if(newPhoto!==null) updateData.photo=newPhoto;
-
-     update(ref(db,"students/"+cls+"/"+key), updateData);
+     update(ref(db,"students/"+cls+"/"+key),updateData);
    }
  }
  else{
-   update(ref(db,"students/"+cls+"/"+key),{
-     name:newName,
-     roll:newRoll
-   });
+   update(ref(db,"students/"+cls+"/"+key),updateData);
  }
 }
 
-/* =======================
+/* ======================
    SHOW ALL STUDENTS
-======================= */
+====================== */
 window.showAll = function(){
  const allRef = ref(db,"students");
  onValue(allRef,(snap)=>{
@@ -238,9 +241,9 @@ window.showAll = function(){
  });
 }
 
-/* =======================
+/* ======================
    PDF FUNCTIONS
-======================= */
+====================== */
 window.downloadClassPDF = function(cls,withImg){
  let table=document.getElementById("classTable").cloneNode(true);
  if(!withImg){
@@ -251,8 +254,7 @@ window.downloadClassPDF = function(cls,withImg){
   <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
   <h3 style="text-align:center;">${cls} Class Students</h3>
   <hr>${table.outerHTML}`);
- w.print(); 
- w.close();
+ w.print(); w.close();
 }
 
 window.downloadAllPDF = function(withImg){
@@ -265,8 +267,7 @@ window.downloadAllPDF = function(withImg){
   <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
   <h3 style="text-align:center;">All Students</h3>
   <hr>${table.outerHTML}`);
- w.print(); 
- w.close();
+ w.print(); w.close();
 }
 </script>
 
