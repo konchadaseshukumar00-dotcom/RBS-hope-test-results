@@ -4,10 +4,7 @@
 <title>Student Details</title>
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0;}
-.header{
- background:#0b5394;color:white;padding:15px;
- display:flex;justify-content:space-between;align-items:center;
-}
+.header{background:#0b5394;color:white;padding:15px;}
 .box{
  background:white;width:900px;margin:30px auto;
  padding:20px;border-radius:10px;box-shadow:0 0 12px #999;
@@ -15,21 +12,9 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
 }
 .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
 .bar{background:#cfe2f3;padding:10px;border-radius:6px;cursor:pointer;}
-
-table{
- width:90%;
- margin:15px auto;
- border-collapse:collapse;
-}
-th,td{
- border:1px solid #999;
- padding:8px;
- text-align:center;
-}
+table{width:90%;margin:auto;border-collapse:collapse;}
+th,td{border:1px solid #999;padding:6px;}
 th{background:#0b5394;color:white;}
-
-input{padding:5px;margin:3px;}
-button{padding:6px 10px;cursor:pointer;}
 .adminOnly{display:none;}
 </style>
 </head>
@@ -37,7 +22,6 @@ button{padding:6px 10px;cursor:pointer;}
 
 <div class="header">
  <h2>RBS Institutions - Student Details</h2>
- <button onclick="history.back()">⬅ Back</button>
 </div>
 
 <div class="box">
@@ -45,133 +29,96 @@ button{padding:6px 10px;cursor:pointer;}
 
 <div id="allBar" class="bar adminOnly" onclick="showAll()">📋 All Students</div>
 <br>
-
 <div class="grid" id="classBars"></div>
 <div id="list"></div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import { getDatabase, ref, onValue, push, remove } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+
+// 🔹 Your Firebase Config
+const firebaseConfig = {
+ apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
+ authDomain: "rbs-institutions-portal.firebaseapp.com",
+ databaseURL: "https://rbs-institutions-portal-default-rtdb.firebaseio.com",
+ projectId: "rbs-institutions-portal",
+ storageBucket: "rbs-institutions-portal.firebasestorage.app",
+ messagingSenderId: "881467222162",
+ appId: "1:881467222162:web:7acd765c4f7490ea6b9e4b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const studentsRef = ref(db, "students");
+
 let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) document.querySelectorAll(".adminOnly").forEach(e=>e.style.display="block");
-
-let data = JSON.parse(localStorage.getItem("studentsData")) || 
-{1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[],9:[],10:[]};
-
-function save(){
- localStorage.setItem("studentsData",JSON.stringify(data));
-}
 
 // Create class bars
 for(let i=1;i<=10;i++){
  classBars.innerHTML+=`<div class="bar" onclick="showClass(${i})">${i} Class</div>`;
 }
 
-// Show class students in table
-function showClass(cls){
- let html=`<h3>${cls} Class Students</h3>`;
+window.showClass = function(cls){
+ const classRef = ref(db, "students/"+cls);
+ onValue(classRef, (snap)=>{
+   let data = snap.val() || {};
+   let keys = Object.keys(data);
+   let html=`<h3>${cls} Class Students</h3>`;
 
- if(isAdmin){
-   html+=`<button onclick="downloadClassPDF(${cls})">📄 Download Class PDF</button><br><br>`;
- }
+   if(keys.length==0) html+="<p>No students</p>";
+   else{
+     html+=`<table><tr><th>S.No</th><th>Name</th><th>Roll</th>${isAdmin?"<th>Action</th>":""}</tr>`;
+     keys.forEach((k,i)=>{
+       let s=data[k];
+       html+=`<tr>
+         <td>${i+1}</td>
+         <td>${s.name}</td>
+         <td>${s.roll}</td>
+         ${isAdmin?`<td><button onclick="delStudent('${cls}','${k}')">❌</button></td>`:""}
+       </tr>`;
+     });
+     html+="</table>";
+   }
 
- if(data[cls].length==0){
-   html+="<p>No students available</p>";
- } 
- else {
- html+=`<table id="classTable">
-   <tr>
-     <th>S.No</th>
-     <th>Name</th>
-     <th>Roll No</th>
-     ${isAdmin? "<th>Action</th>":""}
-   </tr>`;
-
- data[cls].forEach((s,i)=>{
-   html+=`<tr>
-     <td>${i+1}</td>
-     <td>${s.name}</td>
-     <td>${s.roll}</td>
-     ${isAdmin? `<td><button onclick="del(${cls},${i})">❌ Delete</button></td>`:""}
-   </tr>`;
+   if(isAdmin){
+     html+=`<br>
+       <input id="n" placeholder="Name">
+       <input id="r" placeholder="Roll">
+       <button onclick="addStudent(${cls})">Add</button>`;
+   }
+   list.innerHTML=html;
  });
- html+="</table>";
- }
-
- if(isAdmin){
- html+=`
-   <h4>Add Student</h4>
-   <input id="n" placeholder="Name">
-   <input id="r" placeholder="Roll No">
-   <button onclick="add(${cls})">Add</button>
- `;
- }
-
- list.innerHTML=html;
 }
 
-// Add student
-function add(cls){
- if(n.value && r.value){
-   data[cls].push({name:n.value, roll:r.value});
-   save();
-   showClass(cls);
+window.addStudent = function(cls){
+ let name=document.getElementById("n").value;
+ let roll=document.getElementById("r").value;
+ if(name && roll){
+   const classRef = ref(db, "students/"+cls);
+   push(classRef,{name,roll});
  }
 }
 
-// Delete student
-function del(cls,i){
- data[cls].splice(i,1);
- save();
- showClass(cls);
+window.delStudent = function(cls,key){
+ const sRef = ref(db,"students/"+cls+"/"+key);
+ remove(sRef);
 }
 
-// Show all students
-function showAll(){
- let html="<h3>All Students</h3>";
-
- html+=`<button onclick="downloadAllPDF()">📄 Download All Students PDF</button><br><br>`;
-
- html+=`<table id="allTable">
-   <tr>
-     <th>Class</th>
-     <th>S.No</th>
-     <th>Name</th>
-     <th>Roll No</th>
-   </tr>`;
-
- for(let c in data){
-   data[c].forEach((s,i)=>{
-     html+=`<tr>
-       <td>${c}</td>
-       <td>${i+1}</td>
-       <td>${s.name}</td>
-       <td>${s.roll}</td>
-     </tr>`;
-   });
- }
- html+="</table>";
-
- list.innerHTML=html;
-}
-
-// Download class PDF
-function downloadClassPDF(cls){
-  let table = document.getElementById("classTable").outerHTML;
-  let win = window.open("", "", "width=900,height=700");
-  win.document.write("<h2>"+cls+" Class Students</h2>");
-  win.document.write(table);
-  win.print();
-  win.close();
-}
-
-// Download all PDF
-function downloadAllPDF(){
-  let table = document.getElementById("allTable").outerHTML;
-  let win = window.open("", "", "width=900,height=700");
-  win.document.write("<h2>All Students</h2>");
-  win.document.write(table);
-  win.print();
-  win.close();
+window.showAll = function(){
+ onValue(studentsRef,(snap)=>{
+   let data=snap.val()||{};
+   let html="<h3>All Students</h3>";
+   html+=`<table><tr><th>Class</th><th>Name</th><th>Roll</th></tr>`;
+   for(let c in data){
+     Object.values(data[c]).forEach(s=>{
+       html+=`<tr><td>${c}</td><td>${s.name}</td><td>${s.roll}</td></tr>`;
+     });
+   }
+   html+="</table>";
+   list.innerHTML=html;
+ });
 }
 </script>
 
