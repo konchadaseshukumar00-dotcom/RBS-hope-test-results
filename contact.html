@@ -4,26 +4,21 @@
 <title>Results</title>
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0;}
-.header{
- background:#0b5394;color:white;padding:15px;
- display:flex;justify-content:space-between;align-items:center;
-}
+.header{background:#0b5394;color:white;padding:15px;}
 .box{
  background:white;width:900px;margin:30px auto;
  padding:20px;border-radius:10px;box-shadow:0 0 12px #999;
  text-align:center;
 }
-.bar{background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;cursor:pointer;}
+.bar{background:#cfe2f3;padding:10px;margin:8px;border-radius:6px;cursor:pointer;}
 .adminOnly{display:none;}
-input{padding:6px;margin:5px;}
-button{background:#990000;color:white;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;}
+input{padding:5px;margin:5px;}
 </style>
 </head>
 <body>
 
 <div class="header">
  <h2>RBS Institutions - Results</h2>
- <button onclick="history.back()">⬅ Back</button>
 </div>
 
 <div class="box">
@@ -31,76 +26,88 @@ button{background:#990000;color:white;border:none;padding:6px 12px;border-radius
 <div id="adminPanel" class="adminOnly">
  <h3>Create New Test (10th Class)</h3>
  <input id="testName" placeholder="Test Name">
- <input id="subjects" placeholder="Subjects (comma separated)">
+ <input id="subjects" placeholder="Subjects comma separated">
  <button onclick="loadStudents()">Load Students</button>
  <div id="marksBox"></div>
- <hr>
 </div>
 
 <div id="testBars"></div>
-
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+
+const firebaseConfig = {
+ apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
+ authDomain: "rbs-institutions-portal.firebaseapp.com",
+ databaseURL: "https://rbs-institutions-portal-default-rtdb.firebaseio.com",
+ projectId: "rbs-institutions-portal",
+ storageBucket: "rbs-institutions-portal.firebasestorage.app",
+ messagingSenderId: "881467222162",
+ appId: "1:881467222162:web:7acd765c4f7490ea6b9e4b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
 let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) adminPanel.style.display="block";
 
-let studentsData = JSON.parse(localStorage.getItem("studentsData"))||{};
-let tenthStudents = studentsData["10"] || [];
-let tests = JSON.parse(localStorage.getItem("savedTests"))||[];
+const studentsRef = ref(db,"students/10");
+const testsRef = ref(db,"tests");
 
-function showBars(){
- testBars.innerHTML="<h3>Available Tests</h3>";
- if(tests.length===0){
-   testBars.innerHTML+="<p>No Results Available</p>";
-   return;
- }
- tests.forEach((t,i)=>{
-  testBars.innerHTML+=`<div class="bar" onclick="openStudentResult(${i})">${t.testName}</div>`;
+window.loadStudents = function(){
+ onValue(studentsRef,(snap)=>{
+  let students = snap.val()||{};
+  let subs = subjects.value.split(",").map(s=>s.trim());
+  let html="<h4>Enter Marks</h4>";
+
+  Object.values(students).forEach((s,i)=>{
+    html+=`<b>${s.name} (${s.roll})</b><br>`;
+    subs.forEach((sub,j)=>{
+      html+=`${sub}: <input id="m${i}_${j}" size="4"><br>`;
+    });
+    html+="<hr>";
+  });
+
+  html+=`<button onclick="saveTest()">Save Test</button>`;
+  marksBox.innerHTML=html;
  });
 }
-showBars();
 
-function loadStudents(){
- if(tenthStudents.length===0){
-   marksBox.innerHTML="<p>No 10th Class Students Found</p>";
-   return;
- }
- let subs=subjects.value.split(",").map(s=>s.trim());
- let html="<h4>Enter Marks</h4>";
- tenthStudents.forEach((s,i)=>{
-   html+=`<b>${s.name} (${s.roll})</b><br>`;
-   subs.forEach((sub,j)=>{
-     html+=`${sub}: <input id="m${i}_${j}" size="4"><br>`;
-   });
-   html+="<hr>";
- });
- html+=`<button onclick="saveTest()">Save Test</button>`;
- marksBox.innerHTML=html;
-}
-
-function saveTest(){
- let subs=subjects.value.split(",").map(s=>s.trim());
+window.saveTest = function(){
+ let subs = subjects.value.split(",").map(s=>s.trim());
  let obj={testName:testName.value,subjects:subs,results:[]};
- tenthStudents.forEach((s,i)=>{
-   let marks=[];
-   subs.forEach((_,j)=>{
-     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
-   });
-   obj.results.push({roll:s.roll,name:s.name,marks});
+
+ onValue(studentsRef,(snap)=>{
+  let students = snap.val()||{};
+  Object.values(students).forEach((s,i)=>{
+    let marks=[];
+    subs.forEach((_,j)=>{
+      marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
+    });
+    obj.results.push({roll:s.roll,name:s.name,marks});
+  });
+  push(testsRef,obj);
+  alert("Test Saved");
  });
- tests.push(obj);
- localStorage.setItem("savedTests",JSON.stringify(tests));
- alert("Test Saved");
- showBars();
 }
 
-function openStudentResult(i){
- localStorage.setItem("selectedTestIndex",i);
- location.href="services.html";
+// Show available tests
+onValue(testsRef,(snap)=>{
+ let data=snap.val()||{};
+ testBars.innerHTML="<h3>Available Tests</h3>";
+ Object.values(data).forEach((t,i)=>{
+  testBars.innerHTML+=`<div class="bar" onclick="openResult(${i})">${t.testName}</div>`;
+ });
+});
+
+window.openResult = function(i){
+ localStorage.setItem("testIndex",i);
+ location.href="studentresult.html";
 }
 </script>
 
 </body>
 </html>
-
