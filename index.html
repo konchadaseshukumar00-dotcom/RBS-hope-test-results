@@ -31,9 +31,9 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
 </div>
 
 <div class="menu">
-  <div class="item" onclick="location.href='about.html'">👨‍🎓 Student Details</div>
-  <div class="item" onclick="location.href='contact.html'">📊 Results</div>
-  <div class="item" onclick="location.href='projects.html'">💰 Fee Details</div>
+  <div class="item" onclick="location.href='students.html'">👨‍🎓 Student Details</div>
+  <div class="item" onclick="location.href='results.html'">📊 Results</div>
+  <div class="item" onclick="location.href='fees.html'">💰 Fee Details</div>
 </div>
 
 <script>
@@ -44,7 +44,6 @@ if(isAdmin){
  btn.innerText="Logout";
  btn.onclick=()=>{
    localStorage.removeItem("isAdmin");
-   alert("Logged Out");
    location.reload();
  };
 }
@@ -54,7 +53,6 @@ function adminLogin(){
  let p=prompt("Admin Password:");
  if(u==="admin" && p==="rbs123"){
    localStorage.setItem("isAdmin","true");
-   alert("Admin Logged In");
    location.reload();
  }else alert("Invalid Login");
 }
@@ -62,4 +60,3 @@ function adminLogin(){
 
 </body>
 </html>
-
