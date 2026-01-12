@@ -15,7 +15,19 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
 }
 .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
 .bar{background:#cfe2f3;padding:10px;border-radius:6px;cursor:pointer;}
-.student{background:#f1f1f1;margin:5px auto;padding:6px;width:80%;border-radius:4px;}
+
+table{
+ width:90%;
+ margin:15px auto;
+ border-collapse:collapse;
+}
+th,td{
+ border:1px solid #999;
+ padding:8px;
+ text-align:center;
+}
+th{background:#0b5394;color:white;}
+
 input{padding:5px;margin:3px;}
 .adminOnly{display:none;}
 </style>
@@ -43,46 +55,94 @@ if(isAdmin) document.querySelectorAll(".adminOnly").forEach(e=>e.style.display="
 let data = JSON.parse(localStorage.getItem("studentsData")) || 
 {1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[],9:[],10:[]};
 
-function save(){localStorage.setItem("studentsData",JSON.stringify(data));}
+function save(){
+ localStorage.setItem("studentsData",JSON.stringify(data));
+}
 
+// Create class bars
 for(let i=1;i<=10;i++){
  classBars.innerHTML+=`<div class="bar" onclick="showClass(${i})">${i} Class</div>`;
 }
 
+// Show one class in TABLE
 function showClass(cls){
- let html=`<h3>${cls} Class</h3>`;
+ let html=`<h3>${cls} Class Students</h3>`;
+
+ if(data[cls].length==0){
+   html+="<p>No students available</p>";
+ } else {
+ html+=`<table>
+   <tr>
+     <th>S.No</th>
+     <th>Name</th>
+     <th>Roll No</th>
+     ${isAdmin? "<th>Action</th>":""}
+   </tr>`;
+
  data[cls].forEach((s,i)=>{
-   html+=`<div class="student">${s.name} (${s.roll})
-   ${isAdmin?`<button onclick="del(${cls},${i})">❌</button>`:""}
-   </div>`;
+   html+=`<tr>
+     <td>${i+1}</td>
+     <td>${s.name}</td>
+     <td>${s.roll}</td>
+     ${isAdmin? `<td><button onclick="del(${cls},${i})">❌ Delete</button></td>`:""}
+   </tr>`;
  });
- if(isAdmin){
-   html+=`<input id="n" placeholder="Name">
-   <input id="r" placeholder="Roll No">
-   <button onclick="add(${cls})">Add</button>`;
+ html+="</table>";
  }
+
+ // Admin Add Form
+ if(isAdmin){
+ html+=`
+   <h4>Add Student</h4>
+   <input id="n" placeholder="Name">
+   <input id="r" placeholder="Roll No">
+   <button onclick="add(${cls})">Add</button>
+ `;
+ }
+
  list.innerHTML=html;
 }
 
+// Add Student
 function add(cls){
  if(n.value && r.value){
-   data[cls].push({name:n.value,roll:r.value});
-   save(); showClass(cls);
+   data[cls].push({name:n.value, roll:r.value});
+   save();
+   showClass(cls);
  }
-}
-function del(cls,i){
- data[cls].splice(i,1);
- save(); showClass(cls);
 }
 
+// Delete Student
+function del(cls,i){
+ data[cls].splice(i,1);
+ save();
+ showClass(cls);
+}
+
+// Show ALL students in TABLE (Admin)
 function showAll(){
  let html="<h3>All Students</h3>";
+
+ html+=`<table>
+   <tr>
+     <th>Class</th>
+     <th>S.No</th>
+     <th>Name</th>
+     <th>Roll No</th>
+   </tr>`;
+
  for(let c in data){
-   html+=`<h4>${c} Class</h4>`;
-   data[c].forEach(s=>{
-     html+=`<div class="student">${s.name} (${s.roll})</div>`;
+   data[c].forEach((s,i)=>{
+     html+=`<tr>
+       <td>${c}</td>
+       <td>${i+1}</td>
+       <td>${s.name}</td>
+       <td>${s.roll}</td>
+     </tr>`;
    });
  }
+ html+="</table>";
+
  list.innerHTML=html;
 }
 </script>
