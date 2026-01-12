@@ -1,62 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>RBS School Portal</title>
+<title>Student Details</title>
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0;}
 .header{
-  background:#0b5394;color:white;padding:15px;
-  display:flex;justify-content:space-between;align-items:center;
+ background:#0b5394;color:white;padding:15px;
+ display:flex;justify-content:space-between;align-items:center;
 }
-.admin-btn{
-  background:#990000;color:white;border:none;
-  padding:7px 14px;border-radius:5px;cursor:pointer;
+.box{
+ background:white;width:900px;margin:30px auto;
+ padding:20px;border-radius:10px;box-shadow:0 0 12px #999;
+ text-align:center;
 }
-.menu{
-  width:600px;margin:40px auto;background:white;
-  padding:20px;border-radius:10px;box-shadow:0 0 10px #999;
-  text-align:center;
-}
-.item{
-  background:#d9ead3;padding:15px;margin:15px;
-  border-radius:6px;font-size:18px;cursor:pointer;
-}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+.bar{background:#cfe2f3;padding:10px;border-radius:6px;cursor:pointer;}
+.student{background:#f1f1f1;margin:5px auto;padding:6px;width:80%;border-radius:4px;}
+input{padding:5px;margin:3px;}
+.adminOnly{display:none;}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h2>RBS Institutions</h2>
-  <button class="admin-btn" id="adminBtn" onclick="adminLogin()">Admin Login</button>
+ <h2>RBS Institutions - Student Details</h2>
+ <button onclick="history.back()">⬅ Back</button>
 </div>
 
-<div class="menu">
-  <div class="item" onclick="location.href='students.html'">👨‍🎓 Student Details</div>
-  <div class="item" onclick="location.href='results.html'">📊 Results</div>
-  <div class="item" onclick="location.href='fees.html'">💰 Fee Details</div>
+<div class="box">
+<h3>Class Wise Students</h3>
+
+<div id="allBar" class="bar adminOnly" onclick="showAll()">📋 All Students</div>
+
+<div class="grid" id="classBars"></div>
+<div id="list"></div>
 </div>
 
 <script>
 let isAdmin = localStorage.getItem("isAdmin")==="true";
-const btn=document.getElementById("adminBtn");
+if(isAdmin) document.querySelectorAll(".adminOnly").forEach(e=>e.style.display="block");
 
-if(isAdmin){
- btn.innerText="Logout";
- btn.onclick=()=>{
-   localStorage.removeItem("isAdmin");
-   alert("Logged Out");
-   location.reload();
- };
+let data = JSON.parse(localStorage.getItem("studentsData")) || 
+{1:[],2:[],3:[],4:[],5:[],6:[],7:[],8:[],9:[],10:[]};
+
+function save(){localStorage.setItem("studentsData",JSON.stringify(data));}
+
+for(let i=1;i<=10;i++){
+ classBars.innerHTML+=`<div class="bar" onclick="showClass(${i})">${i} Class</div>`;
 }
 
-function adminLogin(){
- let u=prompt("Admin Username:");
- let p=prompt("Admin Password:");
- if(u==="admin" && p==="rbs123"){
-   localStorage.setItem("isAdmin","true");
-   alert("Admin Logged In");
-   location.reload();
- }else alert("Invalid Login");
+function showClass(cls){
+ let html=`<h3>${cls} Class</h3>`;
+ data[cls].forEach((s,i)=>{
+   html+=`<div class="student">${s.name} (${s.roll})
+   ${isAdmin?`<button onclick="del(${cls},${i})">❌</button>`:""}
+   </div>`;
+ });
+ if(isAdmin){
+   html+=`<input id="n" placeholder="Name">
+   <input id="r" placeholder="Roll No">
+   <button onclick="add(${cls})">Add</button>`;
+ }
+ list.innerHTML=html;
+}
+
+function add(cls){
+ if(n.value && r.value){
+   data[cls].push({name:n.value,roll:r.value});
+   save(); showClass(cls);
+ }
+}
+function del(cls,i){
+ data[cls].splice(i,1);
+ save(); showClass(cls);
+}
+
+function showAll(){
+ let html="<h3>All Students</h3>";
+ for(let c in data){
+   html+=`<h4>${c} Class</h4>`;
+   data[c].forEach(s=>{
+     html+=`<div class="student">${s.name} (${s.roll})</div>`;
+   });
+ }
+ list.innerHTML=html;
 }
 </script>
 
