@@ -29,6 +29,7 @@ th,td{
 th{background:#0b5394;color:white;}
 
 input{padding:5px;margin:3px;}
+button{padding:6px 10px;cursor:pointer;}
 .adminOnly{display:none;}
 </style>
 </head>
@@ -43,6 +44,7 @@ input{padding:5px;margin:3px;}
 <h3>Class Wise Students</h3>
 
 <div id="allBar" class="bar adminOnly" onclick="showAll()">📋 All Students</div>
+<br>
 
 <div class="grid" id="classBars"></div>
 <div id="list"></div>
@@ -64,14 +66,19 @@ for(let i=1;i<=10;i++){
  classBars.innerHTML+=`<div class="bar" onclick="showClass(${i})">${i} Class</div>`;
 }
 
-// Show one class in TABLE
+// Show class students in table
 function showClass(cls){
  let html=`<h3>${cls} Class Students</h3>`;
 
+ if(isAdmin){
+   html+=`<button onclick="downloadClassPDF(${cls})">📄 Download Class PDF</button><br><br>`;
+ }
+
  if(data[cls].length==0){
    html+="<p>No students available</p>";
- } else {
- html+=`<table>
+ } 
+ else {
+ html+=`<table id="classTable">
    <tr>
      <th>S.No</th>
      <th>Name</th>
@@ -90,7 +97,6 @@ function showClass(cls){
  html+="</table>";
  }
 
- // Admin Add Form
  if(isAdmin){
  html+=`
    <h4>Add Student</h4>
@@ -103,7 +109,7 @@ function showClass(cls){
  list.innerHTML=html;
 }
 
-// Add Student
+// Add student
 function add(cls){
  if(n.value && r.value){
    data[cls].push({name:n.value, roll:r.value});
@@ -112,18 +118,20 @@ function add(cls){
  }
 }
 
-// Delete Student
+// Delete student
 function del(cls,i){
  data[cls].splice(i,1);
  save();
  showClass(cls);
 }
 
-// Show ALL students in TABLE (Admin)
+// Show all students
 function showAll(){
  let html="<h3>All Students</h3>";
 
- html+=`<table>
+ html+=`<button onclick="downloadAllPDF()">📄 Download All Students PDF</button><br><br>`;
+
+ html+=`<table id="allTable">
    <tr>
      <th>Class</th>
      <th>S.No</th>
@@ -144,6 +152,26 @@ function showAll(){
  html+="</table>";
 
  list.innerHTML=html;
+}
+
+// Download class PDF
+function downloadClassPDF(cls){
+  let table = document.getElementById("classTable").outerHTML;
+  let win = window.open("", "", "width=900,height=700");
+  win.document.write("<h2>"+cls+" Class Students</h2>");
+  win.document.write(table);
+  win.print();
+  win.close();
+}
+
+// Download all PDF
+function downloadAllPDF(){
+  let table = document.getElementById("allTable").outerHTML;
+  let win = window.open("", "", "width=900,height=700");
+  win.document.write("<h2>All Students</h2>");
+  win.document.write(table);
+  win.print();
+  win.close();
 }
 </script>
 
