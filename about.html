@@ -42,7 +42,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebas
 import { getDatabase, ref, onValue, push, remove, update }
 from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
-/* Firebase Config */
+/* 🔹 Firebase Config */
 const firebaseConfig = {
  apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
  authDomain: "rbs-institutions-portal.firebaseapp.com",
@@ -55,6 +55,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+/* Admin Check */
 let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) document.querySelectorAll(".adminOnly").forEach(e=>e.style.display="block");
 
@@ -92,8 +93,16 @@ window.showClass = function(cls){
    let keys = Object.keys(data);
    let html=`<h3>${cls} Class Students</h3>`;
 
+   /* PDF Buttons */
    if(isAdmin){
-     html+=`<button onclick="downloadClassPDF(${cls})">📄 Download Class PDF</button><br><br>`;
+     if(cls==10){
+       html+=`
+        <button onclick="downloadClassPDF(${cls},false)">📄 PDF Without Images</button>
+        <button onclick="downloadClassPDF(${cls},true)">🖼️ PDF With Images</button>
+        <br><br>`;
+     } else {
+       html+=`<button onclick="downloadClassPDF(${cls},false)">📄 Download Class PDF</button><br><br>`;
+     }
    }
 
    if(keys.length==0){
@@ -104,7 +113,6 @@ window.showClass = function(cls){
       <tr>
        <th>S.No</th>`;
 
-     // Photo column ONLY for class 10
      if(cls==10) html+=`<th>Photo</th>`;
 
      html+=`
@@ -133,7 +141,7 @@ window.showClass = function(cls){
      html+="</table>";
    }
 
-   /* Add student */
+   /* Add Student */
    if(isAdmin){
      html+=`<br>
       <input id="n" placeholder="Name">
@@ -201,7 +209,7 @@ window.editStudent = async function(cls,key,name,roll){
 
 /* ======================
    SHOW ALL STUDENTS
-   (NO IMAGES HERE)
+   (NO IMAGES)
 ====================== */
 window.showAll = function(){
  const allRef = ref(db,"students");
@@ -241,14 +249,21 @@ window.showAll = function(){
    PDF FUNCTIONS
 ====================== */
 
-// Class-wise PDF (removes Action buttons automatically)
-window.downloadClassPDF = function(cls){
- let table=document.getElementById("classTable").cloneNode(true);
+window.downloadClassPDF = function(cls,withImg){
+ let table = document.getElementById("classTable").cloneNode(true);
 
- // Remove Action column
+ /* Remove Action column */
  table.querySelectorAll("tr").forEach(row=>{
-   if(row.cells.length>4) row.deleteCell(row.cells.length-1);
+   let last = row.cells[row.cells.length-1];
+   if(last && last.innerText.includes("✏️")) row.deleteCell(row.cells.length-1);
  });
+
+ /* Remove Photo column if NOT required */
+ if(cls==10 && !withImg){
+   table.querySelectorAll("tr").forEach(row=>{
+     row.deleteCell(1);
+   });
+ }
 
  let w=window.open("");
  w.document.write(`
@@ -259,7 +274,7 @@ window.downloadClassPDF = function(cls){
  w.close();
 }
 
-// All students PDF (details only)
+/* All Students PDF (No Images Always) */
 window.downloadAllPDF = function(){
  let table=document.getElementById("allTable").outerHTML;
  let w=window.open("");
