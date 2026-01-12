@@ -1,196 +1,103 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Student Details</title>
-
+<title>Results</title>
 <style>
-body{
-    font-family: Arial;
-    background:#eef2f3;
-    padding-top:20px;
-}
-
-.box{
-    background:white;
-    width:750px;
-    margin:40px auto;
-    padding:20px;
-    border-radius:10px;
-    box-shadow:0 0 12px #999;
-    text-align:center;
-}
-
-/* Header */
+body{font-family:Arial;background:#eef2f3;margin:0;}
 .header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
+ background:#0b5394;color:white;padding:15px;
+ display:flex;justify-content:space-between;align-items:center;
 }
-
-.admin-btn{
-    background:#990000;
-    color:white;
-    border:none;
-    padding:8px 15px;
-    border-radius:5px;
-    cursor:pointer;
+.box{
+ background:white;width:900px;margin:30px auto;
+ padding:20px;border-radius:10px;box-shadow:0 0 12px #999;
+ text-align:center;
 }
-
-/* Class bars */
-.bar{
-    background:#cfe2f3;
-    padding:12px;
-    margin:8px;
-    cursor:pointer;
-    border-radius:6px;
-    font-size:17px;
-}
-
-/* Student rows */
-.student{
-    background:#f1f1f1;
-    padding:6px 10px;
-    margin:5px auto;
-    width:70%;
-    border-radius:4px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-}
-
-input{
-    padding:7px;
-    width:60%;
-    margin:5px;
-}
+.bar{background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;cursor:pointer;}
+.adminOnly{display:none;}
+input{padding:6px;margin:5px;}
+button{background:#990000;color:white;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;}
 </style>
 </head>
-
 <body>
+
+<div class="header">
+ <h2>RBS Institutions - Results</h2>
+ <button onclick="history.back()">⬅ Back</button>
+</div>
 
 <div class="box">
 
-    <!-- HEADER -->
-    <div class="header">
-        <h2>Student Details (Class Wise)</h2>
-        <button class="admin-btn" onclick="showLogin()">Admin Login</button>
-    </div>
-
-    <!-- ADMIN ONLY BAR -->
-    <div id="allBar" class="bar" onclick="showAllStudents()" style="display:none;">
-        📋 All Students (Admin Only)
-    </div>
-
-    <!-- CLASS BARS -->
-    <div class="bar" onclick="showClass(1)">1st Class</div>
-    <div class="bar" onclick="showClass(2)">2nd Class</div>
-    <div class="bar" onclick="showClass(3)">3rd Class</div>
-    <div class="bar" onclick="showClass(4)">4th Class</div>
-    <div class="bar" onclick="showClass(5)">5th Class</div>
-    <div class="bar" onclick="showClass(6)">6th Class</div>
-    <div class="bar" onclick="showClass(7)">7th Class</div>
-    <div class="bar" onclick="showClass(8)">8th Class</div>
-    <div class="bar" onclick="showClass(9)">9th Class</div>
-    <div class="bar" onclick="showClass(10)">10th Class</div>
-
-    <div id="list"></div>
+<div id="adminPanel" class="adminOnly">
+ <h3>Create New Test (10th Class)</h3>
+ <input id="testName" placeholder="Test Name">
+ <input id="subjects" placeholder="Subjects (comma separated)">
+ <button onclick="loadStudents()">Load Students</button>
+ <div id="marksBox"></div>
+ <hr>
 </div>
 
-<!-- ADMIN LOGIN POPUP -->
-<div class="box" id="loginBox" style="display:none;">
-    <h3>Admin Login</h3>
-    <input id="user" placeholder="Username">
-    <input id="pass" type="password" placeholder="Password">
-    <br>
-    <button class="admin-btn" onclick="login()">Login</button>
-    <p id="msg" style="color:red;"></p>
+<div id="testBars"></div>
+
 </div>
 
 <script>
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "rbs123";
-let isAdmin = false;
+let isAdmin = localStorage.getItem("isAdmin")==="true";
+if(isAdmin) adminPanel.style.display="block";
 
-/* Student Data */
-const data = {
-  1:["Arjun","Sai"],
-  2:["Ravi"],
-  3:["Kiran"],
-  4:["Anu"],
-  5:["Vikram"],
-  6:["Manoj"],
-  7:["Suresh"],
-  8:["Lakshmi"],
-  9:["Charan"],
-  10:["Kishore","Anjali"]
-};
+let studentsData = JSON.parse(localStorage.getItem("studentsData"))||{};
+let tenthStudents = studentsData["10"] || [];
+let tests = JSON.parse(localStorage.getItem("savedTests"))||[];
 
-function suffix(n){
-  return n==1?"st":n==2?"nd":n==3?"rd":"th";
+function showBars(){
+ testBars.innerHTML="<h3>Available Tests</h3>";
+ if(tests.length===0){
+   testBars.innerHTML+="<p>No Results Available</p>";
+   return;
+ }
+ tests.forEach((t,i)=>{
+  testBars.innerHTML+=`<div class="bar" onclick="openStudentResult(${i})">${t.testName}</div>`;
+ });
+}
+showBars();
+
+function loadStudents(){
+ if(tenthStudents.length===0){
+   marksBox.innerHTML="<p>No 10th Class Students Found</p>";
+   return;
+ }
+ let subs=subjects.value.split(",").map(s=>s.trim());
+ let html="<h4>Enter Marks</h4>";
+ tenthStudents.forEach((s,i)=>{
+   html+=`<b>${s.name} (${s.roll})</b><br>`;
+   subs.forEach((sub,j)=>{
+     html+=`${sub}: <input id="m${i}_${j}" size="4"><br>`;
+   });
+   html+="<hr>";
+ });
+ html+=`<button onclick="saveTest()">Save Test</button>`;
+ marksBox.innerHTML=html;
 }
 
-function showClass(cls){
-    let html = `<h3>${cls}${suffix(cls)} Class Students</h3>`;
-
-    data[cls].forEach((s,i)=>{
-        html += `
-        <div class="student">
-            ${s}
-            ${isAdmin ? `<button onclick="removeStudent(${cls},${i})">❌</button>` : ``}
-        </div>`;
-    });
-
-    if(isAdmin){
-        html += `
-        <input id="newName" placeholder="Add student name">
-        <button class="admin-btn" onclick="addStudent(${cls})">Add</button>
-        `;
-    }
-
-    list.innerHTML = html;
+function saveTest(){
+ let subs=subjects.value.split(",").map(s=>s.trim());
+ let obj={testName:testName.value,subjects:subs,results:[]};
+ tenthStudents.forEach((s,i)=>{
+   let marks=[];
+   subs.forEach((_,j)=>{
+     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
+   });
+   obj.results.push({roll:s.roll,name:s.name,marks});
+ });
+ tests.push(obj);
+ localStorage.setItem("savedTests",JSON.stringify(tests));
+ alert("Test Saved");
+ showBars();
 }
 
-/* ADMIN LOGIN */
-function showLogin(){
-    loginBox.style.display="block";
-}
-
-function login(){
-    if(user.value===ADMIN_USER && pass.value===ADMIN_PASS){
-        isAdmin = true;
-        loginBox.style.display="none";
-        allBar.style.display="block";
-        alert("Admin logged in successfully");
-    }else{
-        msg.innerText="Invalid username or password";
-    }
-}
-
-/* ADD / REMOVE */
-function addStudent(cls){
-    if(newName.value.trim()!==""){
-        data[cls].push(newName.value.trim());
-        showClass(cls);
-    }
-}
-
-function removeStudent(cls,index){
-    data[cls].splice(index,1);
-    showClass(cls);
-}
-
-/* ADMIN ONLY – ALL STUDENTS */
-function showAllStudents(){
-    if(!isAdmin) return;
-
-    let html = `<h3>All Students (All Classes)</h3>`;
-    for(let c in data){
-        html += `<h4>${c}${suffix(c)} Class</h4>`;
-        data[c].forEach(s=>{
-            html += `<div class="student">${s}</div>`;
-        });
-    }
-    list.innerHTML = html;
+function openStudentResult(i){
+ localStorage.setItem("selectedTestIndex",i);
+ location.href="studentresult.html";
 }
 </script>
 
