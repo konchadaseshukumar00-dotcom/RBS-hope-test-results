@@ -4,7 +4,7 @@
 <title>Student Details</title>
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0;}
-.header{background:#0b5394;color:white;padding:15px;}
+.header{background:#0b5394;color:white;padding:15px;text-align:center;}
 .box{
  background:white;width:900px;margin:30px auto;
  padding:20px;border-radius:10px;box-shadow:0 0 12px #999;
@@ -16,19 +16,22 @@ table{width:90%;margin:auto;border-collapse:collapse;}
 th,td{border:1px solid #999;padding:6px;}
 th{background:#0b5394;color:white;}
 .adminOnly{display:none;}
+button{padding:6px 10px;margin:5px;cursor:pointer;}
 </style>
 </head>
 <body>
 
 <div class="header">
- <h2>RBS Institutions - Student Details</h2>
+ <h2>RBS INSTITUTIONS</h2>
+ <h3>Student Details</h3>
 </div>
 
 <div class="box">
 <h3>Class Wise Students</h3>
 
 <div id="allBar" class="bar adminOnly" onclick="showAll()">📋 All Students</div>
-<br>
+<br><br>
+
 <div class="grid" id="classBars"></div>
 <div id="list"></div>
 </div>
@@ -37,7 +40,7 @@ th{background:#0b5394;color:white;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, remove } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
-// 🔹 Your Firebase Config
+// 🔹 Firebase Config
 const firebaseConfig = {
  apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
  authDomain: "rbs-institutions-portal.firebaseapp.com",
@@ -50,16 +53,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const studentsRef = ref(db, "students");
 
 let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) document.querySelectorAll(".adminOnly").forEach(e=>e.style.display="block");
 
-// Create class bars
+// Create class buttons
 for(let i=1;i<=10;i++){
  classBars.innerHTML+=`<div class="bar" onclick="showClass(${i})">${i} Class</div>`;
 }
 
+// ---------- CLASS WISE ----------
 window.showClass = function(cls){
  const classRef = ref(db, "students/"+cls);
  onValue(classRef, (snap)=>{
@@ -67,9 +70,22 @@ window.showClass = function(cls){
    let keys = Object.keys(data);
    let html=`<h3>${cls} Class Students</h3>`;
 
-   if(keys.length==0) html+="<p>No students</p>";
-   else{
-     html+=`<table><tr><th>S.No</th><th>Name</th><th>Roll</th>${isAdmin?"<th>Action</th>":""}</tr>`;
+   // Admin PDF Button
+   if(isAdmin){
+     html+=`<button onclick="downloadClassPDF(${cls})">📄 Download Class PDF</button><br><br>`;
+   }
+
+   if(keys.length==0){
+     html+="<p>No students</p>";
+   } else {
+     html+=`<table id="classTable">
+       <tr>
+         <th>S.No</th>
+         <th>Name</th>
+         <th>Roll No</th>
+         ${isAdmin?"<th>Action</th>":""}
+       </tr>`;
+
      keys.forEach((k,i)=>{
        let s=data[k];
        html+=`<tr>
@@ -82,44 +98,98 @@ window.showClass = function(cls){
      html+="</table>";
    }
 
+   // Add Student
    if(isAdmin){
      html+=`<br>
        <input id="n" placeholder="Name">
-       <input id="r" placeholder="Roll">
+       <input id="r" placeholder="Roll No">
        <button onclick="addStudent(${cls})">Add</button>`;
    }
+
    list.innerHTML=html;
  });
 }
 
+// Add Student
 window.addStudent = function(cls){
  let name=document.getElementById("n").value;
  let roll=document.getElementById("r").value;
  if(name && roll){
-   const classRef = ref(db, "students/"+cls);
-   push(classRef,{name,roll});
+   push(ref(db,"students/"+cls),{name,roll});
  }
 }
 
+// Delete Student
 window.delStudent = function(cls,key){
- const sRef = ref(db,"students/"+cls+"/"+key);
- remove(sRef);
+ remove(ref(db,"students/"+cls+"/"+key));
 }
 
+
+// ---------- ALL STUDENTS ----------
 window.showAll = function(){
- onValue(studentsRef,(snap)=>{
-   let data=snap.val()||{};
+ const allRef = ref(db,"students");
+ onValue(allRef,(snap)=>{
+   let data = snap.val() || {};
    let html="<h3>All Students</h3>";
-   html+=`<table><tr><th>Class</th><th>Name</th><th>Roll</th></tr>`;
+
+   // Admin PDF Button
+   if(isAdmin){
+     html+=`<button onclick="downloadAllPDF()">📄 Download All Students PDF</button><br><br>`;
+   }
+
+   html+=`<table id="allTable">
+     <tr>
+       <th>Class</th>
+       <th>S.No</th>
+       <th>Name</th>
+       <th>Roll No</th>
+     </tr>`;
+
    for(let c in data){
-     Object.values(data[c]).forEach(s=>{
-       html+=`<tr><td>${c}</td><td>${s.name}</td><td>${s.roll}</td></tr>`;
+     let arr = Object.values(data[c]);
+     arr.forEach((s,i)=>{
+       html+=`<tr>
+         <td>${c}</td>
+         <td>${i+1}</td>
+         <td>${s.name}</td>
+         <td>${s.roll}</td>
+       </tr>`;
      });
    }
+
    html+="</table>";
    list.innerHTML=html;
  });
 }
+
+
+// ---------- PDF FUNCTIONS ----------
+window.downloadClassPDF = function(cls){
+ let table = document.getElementById("classTable").outerHTML;
+ let w = window.open("");
+ w.document.write(`
+   <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
+   <h3 style="text-align:center;">${cls} Class Students</h3>
+   <hr>
+   ${table}
+ `);
+ w.print();
+ w.close();
+}
+
+window.downloadAllPDF = function(){
+ let table = document.getElementById("allTable").outerHTML;
+ let w = window.open("");
+ w.document.write(`
+   <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
+   <h3 style="text-align:center;">All Students</h3>
+   <hr>
+   ${table}
+ `);
+ w.print();
+ w.close();
+}
+
 </script>
 
 </body>
