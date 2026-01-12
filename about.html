@@ -42,7 +42,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebas
 import { getDatabase, ref, onValue, push, remove, update }
 from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
-/* 🔹 Firebase Config */
+/* Firebase Config */
 const firebaseConfig = {
  apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
  authDomain: "rbs-institutions-portal.firebaseapp.com",
@@ -55,16 +55,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* Admin check */
 let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) document.querySelectorAll(".adminOnly").forEach(e=>e.style.display="block");
 
-/* Create class bars */
+/* Create class buttons */
 for(let i=1;i<=10;i++){
  classBars.innerHTML+=`<div class="bar" onclick="showClass(${i})">${i} Class</div>`;
 }
 
-/* 📸 Convert & Resize image to Passport Size 40x50 */
+/* Resize image to passport size */
 function readImage(file){
  return new Promise(resolve=>{
    const reader = new FileReader();
@@ -74,10 +73,8 @@ function readImage(file){
        const canvas = document.createElement("canvas");
        canvas.width = 40;
        canvas.height = 50;
-       const ctx = canvas.getContext("2d");
-       ctx.drawImage(img, 0, 0, 40, 50);
-       const resized = canvas.toDataURL("image/jpeg",0.9);
-       resolve(resized);
+       canvas.getContext("2d").drawImage(img,0,0,40,50);
+       resolve(canvas.toDataURL("image/jpeg",0.9));
      }
      img.src = e.target.result;
    }
@@ -96,19 +93,21 @@ window.showClass = function(cls){
    let html=`<h3>${cls} Class Students</h3>`;
 
    if(isAdmin){
-     html+=`
-      <button onclick="downloadClassPDF(${cls},false)">📄 PDF Without Images</button>
-      <button onclick="downloadClassPDF(${cls},true)">🖼️ PDF With Images</button><br><br>`;
+     html+=`<button onclick="downloadClassPDF(${cls})">📄 Download Class PDF</button><br><br>`;
    }
 
    if(keys.length==0){
      html+="<p>No students</p>";
-   }
-   else{
+   } else {
+
      html+=`<table id="classTable">
       <tr>
-       <th>S.No</th>
-       <th>Photo</th>
+       <th>S.No</th>`;
+
+     // Photo column ONLY for class 10
+     if(cls==10) html+=`<th>Photo</th>`;
+
+     html+=`
        <th>Name</th>
        <th>Roll</th>
        ${isAdmin?"<th>Action</th>":""}
@@ -117,13 +116,16 @@ window.showClass = function(cls){
      keys.forEach((k,i)=>{
        let s=data[k];
        html+=`<tr>
-        <td>${i+1}</td>
-        <td>${s.photo?`<img src="${s.photo}">`:"-"}</td>
+        <td>${i+1}</td>`;
+
+       if(cls==10) html+=`<td>${s.photo?`<img src="${s.photo}">`:"-"}</td>`;
+
+       html+=`
         <td>${s.name}</td>
         <td>${s.roll}</td>
         ${isAdmin?`
          <td>
-          <button onclick="editStudent('${cls}','${k}','${s.name}','${s.roll}')">✏️ Edit</button>
+          <button onclick="editStudent('${cls}','${k}','${s.name}','${s.roll}')">✏️</button>
           <button onclick="delStudent('${cls}','${k}')">❌</button>
          </td>`:""}
        </tr>`;
@@ -131,7 +133,7 @@ window.showClass = function(cls){
      html+="</table>";
    }
 
-   /* Add Student */
+   /* Add student */
    if(isAdmin){
      html+=`<br>
       <input id="n" placeholder="Name">
@@ -172,36 +174,34 @@ window.delStudent = function(cls,key){
 }
 
 /* ======================
-   EDIT + ADD PHOTO
+   EDIT
 ====================== */
 window.editStudent = async function(cls,key,name,roll){
  let newName = prompt("Edit Name:",name);
  let newRoll = prompt("Edit Roll:",roll);
  if(newName===null || newRoll===null) return;
 
- let updateData = {name:newName, roll:newRoll};
+ let updateData={name:newName,roll:newRoll};
 
  if(cls==10){
    let imgInput=document.createElement("input");
    imgInput.type="file";
    imgInput.accept="image/*";
    imgInput.click();
-
    imgInput.onchange = async ()=>{
      if(imgInput.files[0]){
-       let newPhoto = await readImage(imgInput.files[0]);
-       updateData.photo = newPhoto;
+       updateData.photo = await readImage(imgInput.files[0]);
      }
      update(ref(db,"students/"+cls+"/"+key),updateData);
    }
- }
- else{
+ } else {
    update(ref(db,"students/"+cls+"/"+key),updateData);
  }
 }
 
 /* ======================
    SHOW ALL STUDENTS
+   (NO IMAGES HERE)
 ====================== */
 window.showAll = function(){
  const allRef = ref(db,"students");
@@ -210,16 +210,13 @@ window.showAll = function(){
   let html="<h3>All Students</h3>";
 
   if(isAdmin){
-    html+=`
-     <button onclick="downloadAllPDF(false)">📄 PDF Without Images</button>
-     <button onclick="downloadAllPDF(true)">🖼️ PDF With Images</button><br><br>`;
+    html+=`<button onclick="downloadAllPDF()">📄 Download All Students PDF</button><br><br>`;
   }
 
   html+=`<table id="allTable">
    <tr>
     <th>Class</th>
     <th>S.No</th>
-    <th>Photo</th>
     <th>Name</th>
     <th>Roll</th>
    </tr>`;
@@ -230,7 +227,6 @@ window.showAll = function(){
       html+=`<tr>
         <td>${c}</td>
         <td>${i+1}</td>
-        <td>${s.photo?`<img src="${s.photo}">`:"-"}</td>
         <td>${s.name}</td>
         <td>${s.roll}</td>
       </tr>`;
@@ -244,30 +240,35 @@ window.showAll = function(){
 /* ======================
    PDF FUNCTIONS
 ====================== */
-window.downloadClassPDF = function(cls,withImg){
+
+// Class-wise PDF (removes Action buttons automatically)
+window.downloadClassPDF = function(cls){
  let table=document.getElementById("classTable").cloneNode(true);
- if(!withImg){
-   table.querySelectorAll("img").forEach(img=>img.remove());
- }
+
+ // Remove Action column
+ table.querySelectorAll("tr").forEach(row=>{
+   if(row.cells.length>4) row.deleteCell(row.cells.length-1);
+ });
+
  let w=window.open("");
  w.document.write(`
   <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
   <h3 style="text-align:center;">${cls} Class Students</h3>
   <hr>${table.outerHTML}`);
- w.print(); w.close();
+ w.print(); 
+ w.close();
 }
 
-window.downloadAllPDF = function(withImg){
- let table=document.getElementById("allTable").cloneNode(true);
- if(!withImg){
-   table.querySelectorAll("img").forEach(img=>img.remove());
- }
+// All students PDF (details only)
+window.downloadAllPDF = function(){
+ let table=document.getElementById("allTable").outerHTML;
  let w=window.open("");
  w.document.write(`
   <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
-  <h3 style="text-align:center;">All Students</h3>
-  <hr>${table.outerHTML}`);
- w.print(); w.close();
+  <h3 style="text-align:center;">All Students Details</h3>
+  <hr>${table}`);
+ w.print(); 
+ w.close();
 }
 </script>
 
