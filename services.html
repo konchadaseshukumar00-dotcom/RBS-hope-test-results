@@ -30,14 +30,15 @@ td,th{border:1px solid #333;padding:6px;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+import { getDatabase, ref, get } from 
+"https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
+/* Firebase Config */
 const firebaseConfig = {
  apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
  authDomain: "rbs-institutions-portal.firebaseapp.com",
  databaseURL: "https://rbs-institutions-portal-default-rtdb.firebaseio.com",
  projectId: "rbs-institutions-portal",
- storageBucket: "rbs-institutions-portal.firebasestorage.app",
  messagingSenderId: "881467222162",
  appId: "1:881467222162:web:7acd765c4f7490ea6b9e4b"
 };
@@ -46,26 +47,46 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const testsRef = ref(db,"tests");
 
+/* =========================
+   GET RESULT FUNCTION
+========================= */
 window.getResult = function(){
  let r = roll.value.trim();
+ if(!r){
+   output.innerHTML="<p class='fail'>Enter Roll Number</p>";
+   return;
+ }
 
- onValue(testsRef,(snap)=>{
+ get(testsRef).then((snap)=>{
   let data = snap.val()||{};
-  let tests = Object.values(data);
-  let index = localStorage.getItem("testIndex");
-  let test = tests[index];
+  
+  // Get selected test key from previous page
+  let testKey = localStorage.getItem("selectedTestKey");
+  let test = data[testKey];
+
+  if(!test){
+    output.innerHTML="<p class='fail'>Test Not Found</p>";
+    return;
+  }
 
   let found=false,total=0,final="PASS";
+
   let html=`<h3>${test.testName}</h3>
-  <table><tr><th>Subject</th><th>Marks</th><th>Status</th></tr>`;
+  <table>
+   <tr>
+    <th>Subject</th>
+    <th>Marks</th>
+    <th>Status</th>
+   </tr>`;
 
   test.results.forEach(res=>{
-   if(res.roll===r){
+   if(res.roll == r){
      found=true;
      res.marks.forEach((m,i)=>{
-       let status=m>=35?"PASS":"FAIL";
+       let status = m>=35 ? "PASS" : "FAIL";
        if(status==="FAIL") final="FAIL";
-       total+=m;
+       total += Number(m);
+
        html+=`<tr>
         <td>${test.subjects[i]}</td>
         <td>${m}</td>
@@ -75,11 +96,15 @@ window.getResult = function(){
    }
   });
 
-  html+=`</table><h3>Total: ${total}</h3>
-  <h3 class="${final==="PASS"?"pass":"fail"}">FINAL RESULT: ${final}</h3>`;
+  html+=`</table>
+   <h3>Total: ${total}</h3>
+   <h3 class="${final==="PASS"?"pass":"fail"}">
+    FINAL RESULT: ${final}
+   </h3>`;
 
   if(!found) html="<p class='fail'>Roll Number Not Found</p>";
-  output.innerHTML=html;
+
+  output.innerHTML = html;
  });
 }
 </script>
