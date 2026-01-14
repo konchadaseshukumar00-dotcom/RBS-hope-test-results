@@ -105,18 +105,20 @@ function showBars(){
      return;
    }
 
-   Object.keys(data).forEach(key=>{
-     let t = data[key];
-     testBars.innerHTML += `
-      <div class="bar">
-        <span onclick="openStudentResult('${key}')">${t.testName}</span>
-        ${isAdmin?`
-        <span>
-         <button class="smallbtn" onclick="downloadTestPDF('${key}')">📄 PDF</button>
-         <button onclick="deleteTest('${key}')">❌</button>
-        </span>`:""}
-      </div>`;
-   });
+  Object.keys(data).forEach(key=>{
+ let t = data[key];
+ testBars.innerHTML += `
+  <div class="bar" onclick="openStudentResult('${key}')">
+    <span>${t.testName}</span>
+    ${isAdmin?`
+    <span>
+     <button class="smallbtn"
+       onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
+     <button
+       onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
+    </span>`:""}
+  </div>`;
+});
  });
 }
 showBars();
@@ -237,4 +239,5 @@ function downloadTestPDF(key){
 
 </body>
 </html>
+
 
