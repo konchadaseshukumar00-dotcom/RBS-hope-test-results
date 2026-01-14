@@ -9,10 +9,16 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
  background:white;width:700px;margin:30px auto;padding:20px;
  border-radius:10px;box-shadow:0 0 12px #999;text-align:center;
 }
-table{border-collapse:collapse;width:100%;}
+table{border-collapse:collapse;width:100%;margin-top:10px;}
 td,th{border:1px solid #333;padding:6px;}
 .pass{color:green;font-weight:bold;}
 .fail{color:red;font-weight:bold;}
+img{width:80px;height:100px;object-fit:cover;border:1px solid #333;}
+button{
+ background:#990000;color:white;border:none;
+ padding:6px 12px;border-radius:5px;cursor:pointer;
+ margin-top:10px;
+}
 </style>
 </head>
 <body>
@@ -21,17 +27,20 @@ td,th{border:1px solid #333;padding:6px;}
  <h2>RBS Institutions - Student Result</h2>
 </div>
 
-<div class="box">
+<div class="box" id="mainBox">
+
 <h3>Enter Roll Number</h3>
 <input id="roll" placeholder="Roll Number">
 <button onclick="getResult()">Get Result</button>
+
 <div id="output"></div>
+
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getDatabase, ref, get } from 
-"https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+import { getDatabase, ref, get } 
+from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
 /* Firebase Config */
 const firebaseConfig = {
@@ -45,67 +54,115 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+
 const testsRef = ref(db,"tests");
+const studentsRef = ref(db,"students/10");
 
 /* =========================
    GET RESULT FUNCTION
 ========================= */
-window.getResult = function(){
+window.getResult = async function(){
  let r = roll.value.trim();
  if(!r){
    output.innerHTML="<p class='fail'>Enter Roll Number</p>";
    return;
  }
 
- get(testsRef).then((snap)=>{
-  let data = snap.val()||{};
-  
-  // Get selected test key from previous page
-  let testKey = localStorage.getItem("selectedTestKey");
-  let test = data[testKey];
+ let testKey = localStorage.getItem("selectedTestKey");
 
-  if(!test){
-    output.innerHTML="<p class='fail'>Test Not Found</p>";
-    return;
+ // Load test
+ let testSnap = await get(ref(db,"tests/"+testKey));
+ let test = testSnap.val();
+
+ if(!test){
+   output.innerHTML="<p class='fail'>Test Not Found</p>";
+   return;
+ }
+
+ // Load students to get name & photo
+ let stuSnap = await get(studentsRef);
+ let stuData = stuSnap.val() || {};
+ let students = Object.values(stuData);
+
+ let student = students.find(s => s.roll == r);
+
+ if(!student){
+   output.innerHTML="<p class='fail'>Roll Number Not Found</p>";
+   return;
+ }
+
+ // Build Result
+ let found=false,total=0,final="PASS";
+
+ let html = `
+ <h3>${test.testName}</h3>
+
+ <table>
+  <tr>
+   <td rowspan="3">${student.photo ? `<img src="${student.photo}">` : ""}</td>
+   <td><b>Name:</b> ${student.name}</td>
+  </tr>
+  <tr><td><b>Roll No:</b> ${student.roll}</td></tr>
+ </table>
+
+ <table>
+  <tr>
+   <th>Subject</th>
+   <th>Marks</th>
+   <th>Status</th>
+  </tr>`;
+
+ test.results.forEach(res=>{
+  if(res.roll == r){
+    found=true;
+    res.marks.forEach((m,i)=>{
+      let status = m>=35 ? "PASS" : "FAIL";
+      if(status==="FAIL") final="FAIL";
+      total += Number(m);
+
+      html+=`<tr>
+       <td>${test.subjects[i]}</td>
+       <td>${m}</td>
+       <td class="${status==="PASS"?"pass":"fail"}">${status}</td>
+      </tr>`;
+    });
   }
-
-  let found=false,total=0,final="PASS";
-
-  let html=`<h3>${test.testName}</h3>
-  <table>
-   <tr>
-    <th>Subject</th>
-    <th>Marks</th>
-    <th>Status</th>
-   </tr>`;
-
-  test.results.forEach(res=>{
-   if(res.roll == r){
-     found=true;
-     res.marks.forEach((m,i)=>{
-       let status = m>=35 ? "PASS" : "FAIL";
-       if(status==="FAIL") final="FAIL";
-       total += Number(m);
-
-       html+=`<tr>
-        <td>${test.subjects[i]}</td>
-        <td>${m}</td>
-        <td class="${status==="PASS"?"pass":"fail"}">${status}</td>
-       </tr>`;
-     });
-   }
-  });
-
-  html+=`</table>
-   <h3>Total: ${total}</h3>
-   <h3 class="${final==="PASS"?"pass":"fail"}">
-    FINAL RESULT: ${final}
-   </h3>`;
-
-  if(!found) html="<p class='fail'>Roll Number Not Found</p>";
-
-  output.innerHTML = html;
  });
+
+ html+=`</table>
+ <h3>Total: ${total}</h3>
+ <h3 class="${final==="PASS"?"pass":"fail"}">
+ FINAL RESULT: ${final}
+ </h3>
+
+ <button onclick="downloadPDF()">📄 Download Result PDF</button>
+ `;
+
+ output.innerHTML = html;
+}
+
+/* =========================
+   PDF DOWNLOAD
+========================= */
+window.downloadPDF = function(){
+
+ let content = `
+ <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
+ <hr>
+ ${document.getElementById("output").innerHTML}
+ <br><br>
+ <table style="width:100%;margin-top:40px;">
+  <tr>
+   <td style="text-align:left;"><b>Teacher Signature</b><br><br>______________</td>
+   <td style="text-align:right;"><b>Parent Signature</b><br><br>______________</td>
+  </tr>
+ </table>
+ `;
+
+ let w = window.open("");
+ w.document.write(content);
+ w.print();
+ w.close();
 }
 </script>
 
