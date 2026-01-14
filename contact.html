@@ -1,119 +1,196 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Student Result</title>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
+<title>Results</title>
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0;}
 .header{
- background:#0b5394;color:white;padding:15px;text-align:center;
+ background:#0b5394;color:white;padding:15px;
+ display:flex;justify-content:space-between;align-items:center;
 }
 .box{
  background:white;width:900px;margin:30px auto;
- padding:20px;border-radius:10px;
- box-shadow:0 0 12px #999;text-align:center;
+ padding:20px;border-radius:10px;box-shadow:0 0 12px #999;
+ text-align:center;
 }
+.bar{
+ background:#cfe2f3;
+ padding:12px;
+ margin:8px;
+ border-radius:6px;
+ cursor:pointer;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+}
+.adminOnly{display:none;}
 input{padding:6px;margin:5px;}
 button{
- background:#990000;color:white;border:none;
- padding:6px 12px;border-radius:5px;cursor:pointer;
+ background:#990000;color:white;
+ border:none;padding:6px 12px;
+ border-radius:5px;cursor:pointer;
 }
-table{width:100%;border-collapse:collapse;margin-top:15px;}
-th,td{border:1px solid #999;padding:6px;}
-th{background:#0b5394;color:white;}
+.smallbtn{
+ background:#0b5394;
+ margin-left:5px;
+}
 </style>
 </head>
 <body>
 
 <div class="header">
- <h2>RBS INSTITUTIONS</h2>
- <h3>10th Class Student Result</h3>
+ <h2>RBS Institutions - Results</h2>
+ <button onclick="history.back()">⬅ Back</button>
 </div>
 
 <div class="box">
 
-<h3>Enter Roll Number</h3>
-<input id="rollInput" placeholder="Enter Roll No">
-<button onclick="getResult()">Get Result</button>
+<div id="adminPanel" class="adminOnly">
+ <h3>Create New Test (10th Class)</h3>
+ <input id="testName" placeholder="Test Name">
+ <input id="subjects" placeholder="Subjects (comma separated)">
+ <button onclick="loadStudents()">Load Students</button>
+ <div id="marksBox"></div>
+ <hr>
+</div>
 
-<div id="resultBox"></div>
+<div id="testBars"></div>
 
 </div>
 
 <script>
-/* 🔹 Firebase Config */
-const firebaseConfig = {
- apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
- authDomain: "rbs-institutions-portal.firebaseapp.com",
- databaseURL: "https://rbs-institutions-portal-default-rtdb.firebaseio.com",
- projectId: "rbs-institutions-portal",
- messagingSenderId: "881467222162",
- appId: "1:881467222162:web:7acd765c4f7490ea6b9e4b"
-};
+let isAdmin = localStorage.getItem("isAdmin")==="true";
+if(isAdmin) adminPanel.style.display="block";
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+let studentsData = JSON.parse(localStorage.getItem("studentsData"))||{};
+let tenthStudents = studentsData["10"] || [];
+let tests = JSON.parse(localStorage.getItem("savedTests"))||[];
 
-function getResult(){
- let roll = document.getElementById("rollInput").value.trim();
- if(!roll){ alert("Enter Roll Number"); return; }
+function showBars(){
+ testBars.innerHTML="<h3>Available Tests</h3>";
 
- const testsRef = db.ref("tests");
- testsRef.once("value",snap=>{
-   let tests = snap.val();
+ if(tests.length===0){
+   testBars.innerHTML+="<p>No Results Available</p>";
+   return;
+ }
 
-   if(!tests){
-     resultBox.innerHTML="<p>No test results available</p>";
-     return;
-   }
-
-   let html="";
-   let found=false;
-
-   Object.keys(tests).forEach(key=>{
-     let t = tests[key];
-
-     // search student result
-     let res = t.results.find(r => r.roll == roll);
-
-     if(res){
-       found=true;
-       html += `
-        <h3>${t.testName}</h3>
-        <table>
-         <tr>
-          <th>Subject</th>
-          <th>Marks</th>
-         </tr>`;
-
-       let total=0;
-       t.subjects.forEach((sub,i)=>{
-         html+=`
-          <tr>
-           <td>${sub}</td>
-           <td>${res.marks[i]}</td>
-          </tr>`;
-         total += Number(res.marks[i]);
-       });
-
-       html+=`
-        <tr>
-         <th>Total</th>
-         <th>${total}</th>
-        </tr>
-        </table><br>`;
-     }
-   });
-
-   if(!found){
-     resultBox.innerHTML="<p>No results found for Roll No: "+roll+"</p>";
-   } else {
-     resultBox.innerHTML=html;
-   }
+ tests.forEach((t,i)=>{
+   testBars.innerHTML+=`
+    <div class="bar">
+      <span onclick="openStudentResult(${i})">${t.testName}</span>
+      ${isAdmin?`
+        <span>
+          <button class="smallbtn" onclick="downloadTestPDF(${i})">📄 PDF</button>
+          <button class="smallbtn" onclick="editTest(${i})">✏️</button>
+          <button onclick="deleteTest(${i})">❌</button>
+        </span>`:""}
+    </div>`;
  });
+}
+showBars();
+
+function loadStudents(){
+ if(tenthStudents.length===0){
+   marksBox.innerHTML="<p>No 10th Class Students Found</p>";
+   return;
+ }
+
+ let subs = subjects.value.split(",").map(s=>s.trim());
+ let html="<h4>Enter Marks</h4>";
+
+ tenthStudents.forEach((s,i)=>{
+   html+=`<b>${s.name} (${s.roll})</b><br>`;
+   subs.forEach((sub,j)=>{
+     html+=`${sub}: <input id="m${i}_${j}" size="4"><br>`;
+   });
+   html+="<hr>";
+ });
+
+ html+=`<button onclick="saveTest()">Save Test</button>`;
+ marksBox.innerHTML=html;
+}
+
+function saveTest(){
+ let subs = subjects.value.split(",").map(s=>s.trim());
+ let obj = {testName:testName.value,subjects:subs,results:[]};
+
+ tenthStudents.forEach((s,i)=>{
+   let marks=[];
+   subs.forEach((_,j)=>{
+     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
+   });
+   obj.results.push({roll:s.roll,name:s.name,marks});
+ });
+
+ tests.push(obj);
+ localStorage.setItem("savedTests",JSON.stringify(tests));
+ alert("Test Saved");
+ marksBox.innerHTML="";
+ testName.value="";
+ subjects.value="";
+ showBars();
+}
+
+function editTest(index){
+ let newName = prompt("Edit Test Name:", tests[index].testName);
+ if(newName){
+   tests[index].testName = newName;
+   localStorage.setItem("savedTests",JSON.stringify(tests));
+   showBars();
+ }
+}
+
+function deleteTest(index){
+ if(confirm("Are you sure you want to delete this test?")){
+   tests.splice(index,1);
+   localStorage.setItem("savedTests",JSON.stringify(tests));
+   showBars();
+ }
+}
+
+function openStudentResult(i){
+ localStorage.setItem("selectedTestIndex",i);
+ location.href="studentresult.html";
+}
+
+/* ===== PDF DOWNLOAD FUNCTION ===== */
+function downloadTestPDF(index){
+ let t = tests[index];
+
+ let html = `
+ <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
+ <h3 style="text-align:center;">${t.testName} - Marks Report</h3>
+ <hr>
+ <table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
+ <tr>
+   <th>S.No</th>
+   <th>Roll No</th>
+   <th>Name</th>`;
+
+ t.subjects.forEach(sub=>{
+   html += `<th>${sub}</th>`;
+ });
+
+ html += `<th>Total</th></tr>`;
+
+ t.results.forEach((r,i)=>{
+   let total = r.marks.reduce((a,b)=>a+b,0);
+   html += `<tr>
+     <td>${i+1}</td>
+     <td>${r.roll}</td>
+     <td>${r.name}</td>`;
+   r.marks.forEach(m=>{
+     html += `<td>${m}</td>`;
+   });
+   html += `<td>${total}</td></tr>`;
+ });
+
+ html += "</table>";
+
+ let w = window.open("");
+ w.document.write(html);
+ w.print();
+ w.close();
 }
 </script>
 
