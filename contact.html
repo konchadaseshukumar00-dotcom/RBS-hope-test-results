@@ -7,7 +7,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-<!-- jsPDF for Mobile PDF Download -->
+<!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -85,10 +85,9 @@ let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) document.getElementById("adminPanel").style.display="block";
 
 /* ======================
-   LOAD 10TH STUDENTS
+   LOAD STUDENTS
 ====================== */
 let tenthStudents = [];
-
 db.ref("students/10").once("value",snap=>{
  let data = snap.val() || {};
  tenthStudents = Object.values(data);
@@ -102,7 +101,6 @@ function showBars(){
 
  db.ref("tests").once("value", snap=>{
    let data = snap.val();
-
    if(!data){
      testBars.innerHTML+="<p>No Results Available</p>";
      return;
@@ -117,8 +115,7 @@ function showBars(){
         <span>
          <button class="smallbtn"
            onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
-         <button
-           onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
+         <button onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
         </span>`:""}
       </div>`;
    });
@@ -131,18 +128,14 @@ showBars();
 ====================== */
 function loadStudents(){
  if(tenthStudents.length===0){
-   marksBox.innerHTML="<p>No 10th Class Students Found</p>";
+   marksBox.innerHTML="<p>No Students Found</p>";
    return;
  }
 
  let subs = subjects.value.split(",").map(s=>s.trim()).filter(s=>s);
- if(subs.length===0){
-   alert("Enter Subjects!");
-   return;
- }
+ if(subs.length===0){ alert("Enter Subjects!"); return; }
 
  let html="<h4>Enter Marks</h4>";
-
  tenthStudents.forEach((s,i)=>{
    html+=`<b>${s.name} (${s.roll})</b><br>`;
    subs.forEach((sub,j)=>{
@@ -150,7 +143,6 @@ function loadStudents(){
    });
    html+="<hr>";
  });
-
  html+=`<button onclick="saveTest()">Save Test</button>`;
  marksBox.innerHTML=html;
 }
@@ -160,12 +152,7 @@ function loadStudents(){
 ====================== */
 function saveTest(){
  let subs = subjects.value.split(",").map(s=>s.trim());
-
- let obj = {
-   testName: testName.value,
-   subjects: subs,
-   results: []
- };
+ let obj = { testName:testName.value, subjects:subs, results:[] };
 
  tenthStudents.forEach((s,i)=>{
    let marks=[];
@@ -176,8 +163,7 @@ function saveTest(){
  });
 
  db.ref("tests").push(obj);
-
- alert("Test Saved Successfully!");
+ alert("Test Saved!");
  marksBox.innerHTML="";
  testName.value="";
  subjects.value="";
@@ -203,47 +189,52 @@ function openStudentResult(key){
 }
 
 /* ======================
-   PDF DOWNLOAD WITH PASS/FAIL
+   PERFECT PDF DOWNLOAD
 ====================== */
 async function downloadTestPDF(key){
  const { jsPDF } = window.jspdf;
- const doc = new jsPDF();
+ const doc = new jsPDF("p","mm","a4");
 
  db.ref("tests/"+key).once("value",snap=>{
    let t = snap.val();
 
-   let y = 15;
+   // ===== Header =====
    doc.setFontSize(18);
-   doc.text("RBS INSTITUTIONS",105,y,{align:"center"});
-   y+=8;
+   doc.text("RBS INSTITUTIONS",105,15,{align:"center"});
    doc.setFontSize(14);
-   doc.text(t.testName+" - Marks Report",105,y,{align:"center"});
-   y+=10;
+   doc.text(t.testName+" - Marks Report",105,23,{align:"center"});
+   doc.line(10,27,200,27);
 
-   let startX = 10;
-   let colWidths = [10,22,40];
-   t.subjects.forEach(()=>colWidths.push(15));
-   colWidths.push(18); // Total
-   colWidths.push(20); // Result
+   // ===== Column Positions =====
+   let startY = 35;
+   let rowHeight = 8;
 
-   let headers = ["S.No","Roll","Name",...t.subjects,"Total","Result"];
+   let cols = [
+     {title:"S.No", x:10},
+     {title:"Roll No", x:25},
+     {title:"Name", x:55}
+   ];
 
-   function drawRow(row,yPos){
-     let x = startX;
-     row.forEach((cell,i)=>{
-       doc.rect(x,yPos,colWidths[i],8);
-       doc.text(String(cell), x+2, yPos+6);
-       x += colWidths[i];
-     });
-   }
+   let xPos = 55;
+   t.subjects.forEach(sub=>{
+     xPos += 20;
+     cols.push({title:sub, x:xPos});
+   });
 
-   drawRow(headers,y);
-   y+=8;
+   cols.push({title:"Total", x:xPos+20});
+   cols.push({title:"Result", x:xPos+40});
 
+   // ===== Draw Header Row =====
+   doc.setFontSize(10);
+   cols.forEach(c=>{
+     doc.text(c.title, c.x, startY);
+   });
+
+   let y = startY + rowHeight;
+
+   // ===== Draw Data Rows =====
    t.results.forEach((r,i)=>{
      let total = r.marks.reduce((a,b)=>a+b,0);
-
-     // ---- PASS / FAIL RULE ----
      let result = total >= 35 ? "PASS" : "FAIL";
 
      let row = [
@@ -255,16 +246,20 @@ async function downloadTestPDF(key){
        result
      ];
 
-     drawRow(row,y);
-     y+=8;
+     row.forEach((cell,index)=>{
+       doc.text(String(cell), cols[index].x, y);
+     });
 
-     if(y>270){
+     y += rowHeight;
+
+     // New Page if needed
+     if(y > 280){
        doc.addPage();
-       y=15;
+       y = 20;
      }
    });
 
-   // ---- Save PDF ----
+   // ===== Save File =====
    doc.save(t.testName+"_Results.pdf");
  });
 }
