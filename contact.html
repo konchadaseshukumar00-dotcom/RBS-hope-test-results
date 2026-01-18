@@ -25,7 +25,7 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
  cursor:pointer;display:flex;justify-content:space-between;align-items:center;
 }
 .adminOnly{display:none;}
-input{padding:6px;margin:5px;}
+input,select{padding:6px;margin:5px;}
 button{
  background:#990000;color:white;border:none;
  padding:6px 12px;border-radius:5px;cursor:pointer;
@@ -50,7 +50,15 @@ button{
  <button onclick="loadStudents()">Load Students</button>
 
  <br><br>
- <button onclick="downloadAllProgressReports()">📄 Download Progress Report (All Students)</button>
+
+ <!-- Progress Report Test Selector -->
+ <select id="testSelect">
+   <option value="">-- Select Test for Progress Report --</option>
+ </select>
+
+ <button onclick="downloadAllProgressReports()">
+ 📄 Download Progress Report (All Students)
+ </button>
 
  <div id="marksBox"></div>
  <hr>
@@ -76,9 +84,7 @@ const db = firebase.database();
 
 /* ================= ADMIN CHECK ================= */
 let isAdmin = localStorage.getItem("isAdmin")==="true";
-if(isAdmin){
- document.getElementById("adminPanel").style.display="block";
-}
+if(isAdmin) document.getElementById("adminPanel").style.display="block";
 
 /* ================= LOAD STUDENTS ================= */
 let tenthStudents=[];
@@ -138,7 +144,10 @@ function saveTest(){
 /* ================= SHOW TEST LIST ================= */
 function showBars(){
  let box=document.getElementById("testBars");
+ let select=document.getElementById("testSelect");
+
  box.innerHTML="<h3>Available Tests</h3>";
+ select.innerHTML='<option value="">-- Select Test for Progress Report --</option>';
 
  db.ref("tests").once("value",snap=>{
    let data=snap.val();
@@ -146,6 +155,8 @@ function showBars(){
 
    Object.keys(data).forEach(key=>{
      let t=data[key];
+
+     // Test bar
      box.innerHTML+=`
      <div class="bar" onclick="openStudentResult('${key}')">
        <span>${t.testName}</span>
@@ -159,12 +170,15 @@ function showBars(){
          onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
        </span>`:""}
      </div>`;
+
+     // Dropdown fill
+     select.innerHTML += `<option value="${key}">${t.testName}</option>`;
    });
  });
 }
 showBars();
 
-/* ================= EDIT TEST ================= */
+/* ================= EDIT / UPDATE / DELETE ================= */
 function editTest(key){
  db.ref("tests/"+key).once("value",snap=>{
    let t=snap.val();
@@ -185,7 +199,6 @@ function editTest(key){
  });
 }
 
-/* ================= UPDATE TEST ================= */
 function updateTest(key){
  let {subNames,passMarks}=parseSubjects();
  let obj={testName:testName.value,subjects:subNames,passMarks:passMarks,results:[]};
@@ -204,7 +217,6 @@ function updateTest(key){
  showBars();
 }
 
-/* ================= DELETE ================= */
 function deleteTest(key){
  if(confirm("Delete Test?")){
    db.ref("tests/"+key).remove();
@@ -212,13 +224,13 @@ function deleteTest(key){
  }
 }
 
-/* ================= OPEN STUDENT RESULT PAGE ================= */
+/* ================= OPEN STUDENT PAGE ================= */
 function openStudentResult(key){
  localStorage.setItem("selectedTestKey",key);
  location.href="services.html";
 }
 
-/* ================= FULL TEST PDF ================= */
+/* ================= FULL TEST MARKS PDF ================= */
 async function downloadTestPDF(key){
  const {jsPDF}=window.jspdf;
  const doc=new jsPDF("l","mm","a4");
@@ -232,23 +244,16 @@ async function downloadTestPDF(key){
    doc.text(t.testName+" - Marks Report",148,23,{align:"center"});
    doc.line(10,28,285,28);
 
-   let pageWidth=285;
-   let totalCols=3+t.subjects.length+2;
-   let colW=(pageWidth-20)/totalCols;
-   let colWidths=[];
-   for(let i=0;i<totalCols;i++) colWidths.push(colW);
-   colWidths[2]=colW*1.6;
-
    let headers=["S.No","Roll","Name",...t.subjects,"Total","Result"];
    let startX=10,startY=35,rowH=8;
    doc.setFontSize(9);
 
    function drawRow(row,y){
      let x=startX;
-     row.forEach((cell,i)=>{
-       doc.rect(x,y,colWidths[i],rowH);
+     row.forEach(cell=>{
+       doc.rect(x,y,20,rowH);
        doc.text(String(cell),x+2,y+5);
-       x+=colWidths[i];
+       x+=20;
      });
    }
 
@@ -258,9 +263,8 @@ async function downloadTestPDF(key){
    t.results.forEach((r,i)=>{
      let total=r.marks.reduce((a,b)=>a+b,0);
      let pass=true;
-     r.marks.forEach((m,j)=>{ if(m<t.passMarks[j]) pass=false; });
-     let result=pass?"PASS":"FAIL";
-     drawRow([i+1,r.roll,r.name,...r.marks,total,result],y);
+     r.marks.forEach((m,j)=>{if(m<t.passMarks[j]) pass=false;});
+     drawRow([i+1,r.roll,r.name,...r.marks,total,pass?"PASS":"FAIL"],y);
      y+=rowH;
      if(y>190){doc.addPage();y=20;}
    });
@@ -272,30 +276,22 @@ async function downloadTestPDF(key){
 /* ================= PROGRESS REPORT ALL STUDENTS ================= */
 async function downloadAllProgressReports(){
 
- let testKey = localStorage.getItem("selectedTestKey");
+ let testKey=document.getElementById("testSelect").value;
  if(!testKey){ alert("Select a test first"); return; }
 
  const {jsPDF}=window.jspdf;
  const doc=new jsPDF("p","mm","a4");
 
- // Load test
- let testSnap = await db.ref("tests/"+testKey).once("value");
- let test = testSnap.val();
+ let testSnap=await db.ref("tests/"+testKey).once("value");
+ let test=testSnap.val();
 
- // Load students
- let stuSnap = await db.ref("students/10").once("value");
- let students = Object.values(stuSnap.val()||{});
+ let stuSnap=await db.ref("students/10").once("value");
+ let students=Object.values(stuSnap.val()||{});
 
- // Sort by roll number
  students.sort((a,b)=>a.roll.localeCompare(b.roll));
-
- let pageYTop = 15;
- let pageYBottom = 155;
- let isTop = true;
 
  function drawStudent(student,resultRow,startY){
    let y=startY;
-
    doc.setFontSize(14);
    doc.text("RBS INSTITUTIONS",105,y,{align:"center"}); y+=8;
    doc.text(test.testName+" - Progress Report",105,y,{align:"center"}); y+=10;
@@ -309,9 +305,7 @@ async function downloadAllProgressReports(){
    doc.text("Status",140,y);
    y+=4; doc.line(20,y,190,y); y+=6;
 
-   let total=0; 
-   let final="PASS";
-
+   let total=0,final="PASS";
    resultRow.marks.forEach((m,i)=>{
      let status=m>=test.passMarks[i]?"PASS":"FAIL";
      if(status==="FAIL") final="FAIL";
@@ -324,35 +318,30 @@ async function downloadAllProgressReports(){
 
    y+=4;
    doc.text("Total: "+total,20,y);
-   y+=6;
    doc.text("FINAL RESULT: "+final,20,y);
 
-   y+=12;
+   y+=10;
    doc.text("Teacher 1 Signature",20,y);
    doc.text("Teacher 2 Signature",80,y);
    doc.text("Parent Signature",150,y);
  }
 
- // Loop students 2 per page
- for(let i=0;i<students.length;i++){
+ let top=true;
+ students.forEach((stu,i)=>{
+   let res=test.results.find(r=>r.roll==stu.roll);
+   if(!res) return;
 
-   let stu = students[i];
-   let res = test.results.find(r=>r.roll==stu.roll);
-   if(!res) continue;
-
-   if(isTop){
-     drawStudent(stu,res,pageYTop);
-     isTop=false;
+   if(top){
+     drawStudent(stu,res,15);
+     top=false;
    }else{
-     // divider
      doc.line(10,145,200,145);
-     drawStudent(stu,res,pageYBottom);
-     isTop=true;
+     drawStudent(stu,res,155);
      doc.addPage();
+     top=true;
    }
- }
+ });
 
- // If last page had only one student, still save
  doc.save("All_Progress_Reports.pdf");
 }
 </script>
