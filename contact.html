@@ -189,7 +189,7 @@ function openStudentResult(key){
 }
 
 /* ======================
-   PERFECT PDF DOWNLOAD
+   PERFECT TABLE PDF
 ====================== */
 async function downloadTestPDF(key){
  const { jsPDF } = window.jspdf;
@@ -198,68 +198,54 @@ async function downloadTestPDF(key){
  db.ref("tests/"+key).once("value",snap=>{
    let t = snap.val();
 
-   // ===== Header =====
+   // Header
    doc.setFontSize(18);
    doc.text("RBS INSTITUTIONS",105,15,{align:"center"});
    doc.setFontSize(14);
    doc.text(t.testName+" - Marks Report",105,23,{align:"center"});
-   doc.line(10,27,200,27);
+   doc.line(10,28,200,28);
 
-   // ===== Column Positions =====
+   // ---- Column widths ----
+   let colWidths = [10, 28, 45]; 
+   t.subjects.forEach(()=>colWidths.push(18));
+   colWidths.push(18); // Total
+   colWidths.push(20); // Result
+
+   let headers = ["S.No","Roll No","Name",...t.subjects,"Total","Result"];
+
+   let startX = 10;
    let startY = 35;
-   let rowHeight = 8;
+   let rowH = 8;
 
-   let cols = [
-     {title:"S.No", x:10},
-     {title:"Roll No", x:25},
-     {title:"Name", x:55}
-   ];
+   function drawRow(row,y){
+     let x = startX;
+     row.forEach((cell,i)=>{
+       doc.rect(x,y,colWidths[i],rowH);
+       doc.text(String(cell), x+2, y+5);
+       x += colWidths[i];
+     });
+   }
 
-   let xPos = 55;
-   t.subjects.forEach(sub=>{
-     xPos += 20;
-     cols.push({title:sub, x:xPos});
-   });
+   // Header row
+   drawRow(headers,startY);
 
-   cols.push({title:"Total", x:xPos+20});
-   cols.push({title:"Result", x:xPos+40});
-
-   // ===== Draw Header Row =====
-   doc.setFontSize(10);
-   cols.forEach(c=>{
-     doc.text(c.title, c.x, startY);
-   });
-
-   let y = startY + rowHeight;
-
-   // ===== Draw Data Rows =====
+   // Data rows
+   let y = startY + rowH;
    t.results.forEach((r,i)=>{
      let total = r.marks.reduce((a,b)=>a+b,0);
      let result = total >= 35 ? "PASS" : "FAIL";
 
-     let row = [
-       i+1,
-       r.roll,
-       r.name,
-       ...r.marks,
-       total,
-       result
-     ];
+     let row = [i+1, r.roll, r.name, ...r.marks, total, result];
+     drawRow(row,y);
+     y += rowH;
 
-     row.forEach((cell,index)=>{
-       doc.text(String(cell), cols[index].x, y);
-     });
-
-     y += rowHeight;
-
-     // New Page if needed
      if(y > 280){
        doc.addPage();
        y = 20;
      }
    });
 
-   // ===== Save File =====
+   // Save PDF
    doc.save(t.testName+"_Results.pdf");
  });
 }
