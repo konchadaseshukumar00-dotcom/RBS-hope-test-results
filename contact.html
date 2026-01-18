@@ -7,6 +7,9 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
+<!-- jsPDF for Mobile PDF Download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0;}
 .header{
@@ -105,20 +108,20 @@ function showBars(){
      return;
    }
 
-  Object.keys(data).forEach(key=>{
- let t = data[key];
- testBars.innerHTML += `
-  <div class="bar" onclick="openStudentResult('${key}')">
-    <span>${t.testName}</span>
-    ${isAdmin?`
-    <span>
-     <button class="smallbtn"
-       onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
-     <button
-       onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
-    </span>`:""}
-  </div>`;
-});
+   Object.keys(data).forEach(key=>{
+     let t = data[key];
+     testBars.innerHTML += `
+      <div class="bar" onclick="openStudentResult('${key}')">
+        <span>${t.testName}</span>
+        ${isAdmin?`
+        <span>
+         <button class="smallbtn"
+           onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
+         <button
+           onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
+        </span>`:""}
+      </div>`;
+   });
  });
 }
 showBars();
@@ -153,7 +156,7 @@ function loadStudents(){
 }
 
 /* ======================
-   SAVE TEST TO FIREBASE
+   SAVE TEST
 ====================== */
 function saveTest(){
  let subs = subjects.value.split(",").map(s=>s.trim());
@@ -200,44 +203,72 @@ function openStudentResult(key){
 }
 
 /* ======================
-   PDF DOWNLOAD
+   PDF DOWNLOAD WITH PASS/FAIL
 ====================== */
-function downloadTestPDF(key){
+async function downloadTestPDF(key){
+ const { jsPDF } = window.jspdf;
+ const doc = new jsPDF();
+
  db.ref("tests/"+key).once("value",snap=>{
    let t = snap.val();
 
-   let html = `
-   <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
-   <h3 style="text-align:center;">${t.testName} - Marks Report</h3>
-   <hr>
-   <table border="1" style="border-collapse:collapse;width:100%;text-align:center;">
-   <tr>
-    <th>S.No</th><th>Roll No</th><th>Name</th>`;
+   let y = 15;
+   doc.setFontSize(18);
+   doc.text("RBS INSTITUTIONS",105,y,{align:"center"});
+   y+=8;
+   doc.setFontSize(14);
+   doc.text(t.testName+" - Marks Report",105,y,{align:"center"});
+   y+=10;
 
-   t.subjects.forEach(sub=> html+=`<th>${sub}</th>`);
-   html+=`<th>Total</th></tr>`;
+   let startX = 10;
+   let colWidths = [10,22,40];
+   t.subjects.forEach(()=>colWidths.push(15));
+   colWidths.push(18); // Total
+   colWidths.push(20); // Result
+
+   let headers = ["S.No","Roll","Name",...t.subjects,"Total","Result"];
+
+   function drawRow(row,yPos){
+     let x = startX;
+     row.forEach((cell,i)=>{
+       doc.rect(x,yPos,colWidths[i],8);
+       doc.text(String(cell), x+2, yPos+6);
+       x += colWidths[i];
+     });
+   }
+
+   drawRow(headers,y);
+   y+=8;
 
    t.results.forEach((r,i)=>{
-     let total=r.marks.reduce((a,b)=>a+b,0);
-     html+=`<tr>
-       <td>${i+1}</td>
-       <td>${r.roll}</td>
-       <td>${r.name}</td>`;
-     r.marks.forEach(m=> html+=`<td>${m}</td>`);
-     html+=`<td>${total}</td></tr>`;
+     let total = r.marks.reduce((a,b)=>a+b,0);
+
+     // ---- PASS / FAIL RULE ----
+     let result = total >= 35 ? "PASS" : "FAIL";
+
+     let row = [
+       i+1,
+       r.roll,
+       r.name,
+       ...r.marks,
+       total,
+       result
+     ];
+
+     drawRow(row,y);
+     y+=8;
+
+     if(y>270){
+       doc.addPage();
+       y=15;
+     }
    });
 
-   html+="</table>";
-
-   let w=window.open("");
-   w.document.write(html);
-   w.print();
-   w.close();
+   // ---- Save PDF ----
+   doc.save(t.testName+"_Results.pdf");
  });
 }
 </script>
 
 </body>
 </html>
-
-
