@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html>
 <head>
 <title>Results</title>
@@ -24,7 +24,7 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
  background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;
  cursor:pointer;display:flex;justify-content:space-between;align-items:center;
 }
-.locked{opacity:0.6;cursor:not-allowed;}
+.locked{opacity:.6;cursor:not-allowed;}
 .adminOnly{display:none;}
 input,select{padding:6px;margin:5px;}
 button{
@@ -90,7 +90,7 @@ const db = firebase.database();
 
 /* ================= ADMIN CHECK ================= */
 let isAdmin = localStorage.getItem("isAdmin")==="true";
-if(isAdmin) document.getElementById("adminPanel").style.display="block";
+if(isAdmin) adminPanel.style.display="block";
 
 /* ================= LOAD STUDENTS ================= */
 let tenthStudents=[];
@@ -98,13 +98,12 @@ db.ref("students/10").once("value",snap=>{
  tenthStudents = Object.values(snap.val() || {});
 });
 
-/* ================= PARSE SUBJECTS ================= */
+/* ================= SUBJECT PARSE ================= */
 function parseSubjects(){
- let raw=document.getElementById("subjects").value
- .split(",").map(s=>s.trim()).filter(s=>s);
- let subNames=[],passMarks=[];
- raw.forEach(item=>{
-   let p=item.split(":");
+ let raw=subjects.value.split(",").map(s=>s.trim()).filter(s=>s);
+ let subNames=[], passMarks=[];
+ raw.forEach(r=>{
+   let p=r.split(":");
    subNames.push(p[0]);
    passMarks.push(Number(p[1]));
  });
@@ -125,20 +124,19 @@ function loadStudents(){
    html+="<hr>";
  });
  html+=`<button onclick="saveTest()">Save Test</button>`;
- document.getElementById("marksBox").innerHTML=html;
+ marksBox.innerHTML=html;
 }
 
 /* ================= SAVE TEST ================= */
 function saveTest(){
  let {subNames,passMarks}=parseSubjects();
- let time=document.getElementById("resultTime").value;
- if(!time){alert("Set result open time");return;}
+ if(!resultTime.value){alert("Set result open time");return;}
 
  let obj={
    testName:testName.value,
    subjects:subNames,
    passMarks,
-   releaseTime:new Date(time).getTime(),
+   releaseTime:new Date(resultTime.value).getTime(),
    results:[]
  };
 
@@ -151,15 +149,14 @@ function saveTest(){
  });
 
  db.ref("tests").push(obj);
- alert("Test Saved!");
+ alert("Test Saved");
  marksBox.innerHTML="";
  showBars();
 }
 
 /* ================= SHOW TEST LIST ================= */
 function showBars(){
- let box=document.getElementById("testBars");
- let select=document.getElementById("testSelect");
+ let box=testBars, select=testSelect;
  box.innerHTML="<h3>Available Tests</h3>";
  select.innerHTML='<option value="">-- Select Test --</option>';
 
@@ -169,24 +166,23 @@ function showBars(){
 
    Object.keys(data).forEach(key=>{
      let t=data[key];
-     let now=Date.now();
-     let locked=!isAdmin && now<t.releaseTime;
+     let locked=!isAdmin && Date.now()<t.releaseTime;
 
      box.innerHTML+=`
      <div class="bar ${locked?"locked":""}"
       ${locked?"":`onclick="openStudentResult('${key}')"`}>
        <span>${t.testName}</span>
        <span>
-        ${locked
-          ? "⏳ Opens at "+new Date(t.releaseTime).toLocaleString()
-          : "✅ View Result"}
+         ${locked
+           ? "⏳ Opens at "+new Date(t.releaseTime).toLocaleString()
+           : "✅ View Result"}
        </span>
        ${isAdmin?`
        <span>
         <button class="smallbtn"
-         onclick="event.stopPropagation();editTest('${key}')">✏</button>
+         onclick="event.stopPropagation();editTest('${key}')">✏ Edit</button>
         <button class="smallbtn"
-         onclick="event.stopPropagation();downloadTestPDF('${key}')">📄</button>
+         onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
         <button
          onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
        </span>`:""}
@@ -198,18 +194,66 @@ function showBars(){
 }
 showBars();
 
-/* ================= OPEN RESULT ================= */
-function openStudentResult(key){
- localStorage.setItem("selectedTestKey",key);
- location.href="services.html";
+/* ================= EDIT TEST ================= */
+function editTest(key){
+ db.ref("tests/"+key).once("value",snap=>{
+   let t=snap.val();
+   testName.value=t.testName;
+   subjects.value=t.subjects.map((s,i)=>`${s}:${t.passMarks[i]}`).join(",");
+   resultTime.value=new Date(t.releaseTime).toISOString().slice(0,16);
+
+   let html="<h4>Edit Marks</h4>";
+   tenthStudents.forEach((stu,i)=>{
+     html+=`<b>${stu.name} (${stu.roll})</b><br>`;
+     t.subjects.forEach((s,j)=>{
+       let old=t.results.find(r=>r.roll==stu.roll)?.marks[j]||0;
+       html+=`${s}: <input id="m${i}_${j}" value="${old}" size="4"><br>`;
+     });
+     html+="<hr>";
+   });
+   html+=`<button onclick="updateTest('${key}')">Update Test</button>`;
+   marksBox.innerHTML=html;
+ });
+}
+
+/* ================= UPDATE TEST ================= */
+function updateTest(key){
+ let {subNames,passMarks}=parseSubjects();
+
+ let obj={
+   testName:testName.value,
+   subjects:subNames,
+   passMarks,
+   releaseTime:new Date(resultTime.value).getTime(),
+   results:[]
+ };
+
+ tenthStudents.forEach((stu,i)=>{
+   let marks=[];
+   subNames.forEach((_,j)=>{
+     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
+   });
+   obj.results.push({roll:stu.roll,name:stu.name,marks});
+ });
+
+ db.ref("tests/"+key).set(obj);
+ alert("Test Updated");
+ marksBox.innerHTML="";
+ showBars();
 }
 
 /* ================= DELETE ================= */
 function deleteTest(key){
- if(confirm("Delete test?")){
+ if(confirm("Delete Test?")){
    db.ref("tests/"+key).remove();
    showBars();
  }
+}
+
+/* ================= OPEN RESULT ================= */
+function openStudentResult(key){
+ localStorage.setItem("selectedTestKey",key);
+ location.href="services.html";
 }
 </script>
 
