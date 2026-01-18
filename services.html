@@ -18,12 +18,12 @@ td,th{border:1px solid #333;padding:6px;}
 .pass{color:green;font-weight:bold;}
 .fail{color:red;font-weight:bold;}
 
+/* ---- PHOTO: show at original resolution, no forced scaling ---- */
 img{
- width:120px;
- height:150px;
- object-fit:contain;
- image-rendering:high-quality;
  border:1px solid #333;
+ max-width:150px;
+ height:auto;
+ image-rendering:auto;
 }
 
 button{
@@ -65,12 +65,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
 const studentsRef = ref(db,"students/10");
 
-/* =========================
-   GET RESULT
-========================= */
+/* ================= GET RESULT ================= */
 window.getResult = async function(){
 
  let rollNo = document.getElementById("roll").value.trim();
@@ -89,7 +86,6 @@ window.getResult = async function(){
 
  let testSnap = await get(ref(db,"tests/"+testKey));
  let test = testSnap.val();
-
  if(!test){
    output.innerHTML="<p class='fail'>Test not found</p>";
    return;
@@ -97,7 +93,6 @@ window.getResult = async function(){
 
  let stuSnap = await get(studentsRef);
  let students = Object.values(stuSnap.val() || {});
-
  let student = students.find(s=>s.roll==rollNo);
 
  if(!student){
@@ -106,7 +101,6 @@ window.getResult = async function(){
  }
 
  let resultRow = test.results.find(r=>r.roll==rollNo);
-
  if(!resultRow){
    output.innerHTML="<p class='fail'>Result not available</p>";
    return;
@@ -114,13 +108,10 @@ window.getResult = async function(){
 
  let total = 0;
  let finalResult = "PASS";
-
  let rowsHTML = "";
 
  resultRow.marks.forEach((m,i)=>{
-   let passMark = test.passMarks[i];
-   let status = m >= passMark ? "PASS" : "FAIL";
-
+   let status = m >= test.passMarks[i] ? "PASS" : "FAIL";
    if(status==="FAIL") finalResult="FAIL";
    total += Number(m);
 
@@ -128,11 +119,11 @@ window.getResult = async function(){
    <tr>
      <td>${test.subjects[i]}</td>
      <td>${m}</td>
-     <td>${passMark}</td>
      <td class="${status==="PASS"?"pass":"fail"}">${status}</td>
    </tr>`;
  });
 
+ // store for PDF
  window.currentStudentData = { student, test, resultRow, total, finalResult };
 
  output.innerHTML = `
@@ -141,7 +132,7 @@ window.getResult = async function(){
  <table>
   <tr>
    <td rowspan="3">
-     ${student.photo ? `<img src="${student.photo}" crossorigin="anonymous">` : ""}
+     ${student.photo ? `<img src="${student.photo}">` : ""}
    </td>
    <td><b>Name:</b> ${student.name}</td>
   </tr>
@@ -152,22 +143,21 @@ window.getResult = async function(){
   <tr>
    <th>Subject</th>
    <th>Marks</th>
-   <th>Pass Mark</th>
    <th>Status</th>
   </tr>
   ${rowsHTML}
  </table>
 
  <h3>Total: ${total}</h3>
- <h3 class="${finalResult==="PASS"?"pass":"fail"}">FINAL RESULT: ${finalResult}</h3>
+ <h3 class="${finalResult==="PASS"?"pass":"fail"}">
+   FINAL RESULT: ${finalResult}
+ </h3>
 
  <button onclick="downloadPDF()">📄 Download Result PDF</button>
  `;
 }
 
-/* =========================
-   PDF DOWNLOAD (REAL FILE)
-========================= */
+/* ================= REAL PDF DOWNLOAD ================= */
 window.downloadPDF = async function(){
 
  const { jsPDF } = window.jspdf;
@@ -175,41 +165,38 @@ window.downloadPDF = async function(){
 
  let { student, test, resultRow, total, finalResult } = window.currentStudentData;
 
- let y = 15;
-
+ let y = 20;
  doc.setFontSize(16);
- doc.text("RBS INSTITUTIONS",105,y,{align:"center"}); y+=10;
- doc.setFontSize(13);
- doc.text(test.testName+" - Student Result",105,y,{align:"center"}); y+=10;
+ doc.text("RBS INSTITUTIONS",105,y,{align:"center"}); 
+ y+=10;
+ doc.text(test.testName+" - Student Result",105,y,{align:"center"});
+ y+=15;
 
- doc.setFontSize(11);
- doc.text("Name: "+student.name,20,y); y+=7;
+ doc.setFontSize(12);
+ doc.text("Name: "+student.name,20,y); y+=8;
  doc.text("Roll No: "+student.roll,20,y); y+=10;
 
  doc.text("Subject",20,y);
- doc.text("Marks",80,y);
- doc.text("Pass Mark",110,y);
- doc.text("Status",150,y);
+ doc.text("Marks",90,y);
+ doc.text("Status",140,y);
  y+=5;
-
- doc.line(20,y,190,y); y+=5;
+ doc.line(20,y,190,y);
+ y+=8;
 
  resultRow.marks.forEach((m,i)=>{
-   let pm = test.passMarks[i];
-   let status = m>=pm?"PASS":"FAIL";
-
+   let status = m >= test.passMarks[i] ? "PASS" : "FAIL";
    doc.text(test.subjects[i],20,y);
-   doc.text(String(m),80,y);
-   doc.text(String(pm),110,y);
-   doc.text(status,150,y);
-   y+=7;
+   doc.text(String(m),90,y);
+   doc.text(status,140,y);
+   y+=8;
  });
 
  y+=5;
- doc.text("Total: "+total,20,y); y+=8;
-
+ doc.text("Total: "+total,20,y);
+ y+=10;
  doc.setFontSize(13);
- doc.text("FINAL RESULT: "+finalResult,20,y); y+=20;
+ doc.text("FINAL RESULT: "+finalResult,20,y);
+ y+=20;
 
  doc.setFontSize(11);
  doc.text("Teacher Signature",20,y);
