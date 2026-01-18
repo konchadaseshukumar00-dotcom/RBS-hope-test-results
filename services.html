@@ -2,6 +2,10 @@
 <html>
 <head>
 <title>Student Result</title>
+
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0;}
 .header{background:#0b5394;color:white;padding:15px;}
@@ -13,7 +17,15 @@ table{border-collapse:collapse;width:100%;margin-top:10px;}
 td,th{border:1px solid #333;padding:6px;}
 .pass{color:green;font-weight:bold;}
 .fail{color:red;font-weight:bold;}
-img{width:80px;height:100px;object-fit:cover;border:1px solid #333;}
+
+img{
+ width:120px;
+ height:150px;
+ object-fit:contain;
+ image-rendering:high-quality;
+ border:1px solid #333;
+}
+
 button{
  background:#990000;color:white;border:none;
  padding:6px 12px;border-radius:5px;cursor:pointer;
@@ -27,7 +39,7 @@ button{
  <h2>RBS Institutions - Student Result</h2>
 </div>
 
-<div class="box" id="mainBox">
+<div class="box">
 
 <h3>Enter Roll Number</h3>
 <input id="roll" placeholder="Roll Number">
@@ -39,8 +51,7 @@ button{
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getDatabase, ref, get } 
-from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
 /* Firebase Config */
 const firebaseConfig = {
@@ -55,51 +66,83 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const testsRef = ref(db,"tests");
 const studentsRef = ref(db,"students/10");
 
 /* =========================
-   GET RESULT FUNCTION
+   GET RESULT
 ========================= */
 window.getResult = async function(){
- let r = roll.value.trim();
- if(!r){
+
+ let rollNo = document.getElementById("roll").value.trim();
+ let output = document.getElementById("output");
+
+ if(!rollNo){
    output.innerHTML="<p class='fail'>Enter Roll Number</p>";
    return;
  }
 
  let testKey = localStorage.getItem("selectedTestKey");
+ if(!testKey){
+   output.innerHTML="<p class='fail'>No test selected</p>";
+   return;
+ }
 
- // Load test
  let testSnap = await get(ref(db,"tests/"+testKey));
  let test = testSnap.val();
 
  if(!test){
-   output.innerHTML="<p class='fail'>Test Not Found</p>";
+   output.innerHTML="<p class='fail'>Test not found</p>";
    return;
  }
 
- // Load students to get name & photo
  let stuSnap = await get(studentsRef);
- let stuData = stuSnap.val() || {};
- let students = Object.values(stuData);
+ let students = Object.values(stuSnap.val() || {});
 
- let student = students.find(s => s.roll == r);
+ let student = students.find(s=>s.roll==rollNo);
 
  if(!student){
    output.innerHTML="<p class='fail'>Roll Number Not Found</p>";
    return;
  }
 
- // Build Result
- let found=false,total=0,final="PASS";
+ let resultRow = test.results.find(r=>r.roll==rollNo);
 
- let html = `
+ if(!resultRow){
+   output.innerHTML="<p class='fail'>Result not available</p>";
+   return;
+ }
+
+ let total = 0;
+ let finalResult = "PASS";
+
+ let rowsHTML = "";
+
+ resultRow.marks.forEach((m,i)=>{
+   let passMark = test.passMarks[i];
+   let status = m >= passMark ? "PASS" : "FAIL";
+
+   if(status==="FAIL") finalResult="FAIL";
+   total += Number(m);
+
+   rowsHTML += `
+   <tr>
+     <td>${test.subjects[i]}</td>
+     <td>${m}</td>
+     <td>${passMark}</td>
+     <td class="${status==="PASS"?"pass":"fail"}">${status}</td>
+   </tr>`;
+ });
+
+ window.currentStudentData = { student, test, resultRow, total, finalResult };
+
+ output.innerHTML = `
  <h3>${test.testName}</h3>
 
  <table>
   <tr>
-   <td rowspan="3">${student.photo ? `<img src="${student.photo}">` : ""}</td>
+   <td rowspan="3">
+     ${student.photo ? `<img src="${student.photo}" crossorigin="anonymous">` : ""}
+   </td>
    <td><b>Name:</b> ${student.name}</td>
   </tr>
   <tr><td><b>Roll No:</b> ${student.roll}</td></tr>
@@ -109,60 +152,70 @@ window.getResult = async function(){
   <tr>
    <th>Subject</th>
    <th>Marks</th>
+   <th>Pass Mark</th>
    <th>Status</th>
-  </tr>`;
+  </tr>
+  ${rowsHTML}
+ </table>
 
- test.results.forEach(res=>{
-  if(res.roll == r){
-    found=true;
-    res.marks.forEach((m,i)=>{
-      let status = m>=35 ? "PASS" : "FAIL";
-      if(status==="FAIL") final="FAIL";
-      total += Number(m);
-
-      html+=`<tr>
-       <td>${test.subjects[i]}</td>
-       <td>${m}</td>
-       <td class="${status==="PASS"?"pass":"fail"}">${status}</td>
-      </tr>`;
-    });
-  }
- });
-
- html+=`</table>
  <h3>Total: ${total}</h3>
- <h3 class="${final==="PASS"?"pass":"fail"}">
- FINAL RESULT: ${final}
- </h3>
+ <h3 class="${finalResult==="PASS"?"pass":"fail"}">FINAL RESULT: ${finalResult}</h3>
 
  <button onclick="downloadPDF()">📄 Download Result PDF</button>
  `;
-
- output.innerHTML = html;
 }
 
 /* =========================
-   PDF DOWNLOAD
+   PDF DOWNLOAD (REAL FILE)
 ========================= */
-window.downloadPDF = function(){
+window.downloadPDF = async function(){
 
- let content = `
- <h2 style="text-align:center;">RBS INSTITUTIONS</h2>
- <hr>
- ${document.getElementById("output").innerHTML}
- <br><br>
- <table style="width:100%;margin-top:40px;">
-  <tr>
-   <td style="text-align:left;"><b>Teacher Signature</b><br><br>______________</td>
-   <td style="text-align:right;"><b>Parent Signature</b><br><br>______________</td>
-  </tr>
- </table>
- `;
+ const { jsPDF } = window.jspdf;
+ const doc = new jsPDF("p","mm","a4");
 
- let w = window.open("");
- w.document.write(content);
- w.print();
- w.close();
+ let { student, test, resultRow, total, finalResult } = window.currentStudentData;
+
+ let y = 15;
+
+ doc.setFontSize(16);
+ doc.text("RBS INSTITUTIONS",105,y,{align:"center"}); y+=10;
+ doc.setFontSize(13);
+ doc.text(test.testName+" - Student Result",105,y,{align:"center"}); y+=10;
+
+ doc.setFontSize(11);
+ doc.text("Name: "+student.name,20,y); y+=7;
+ doc.text("Roll No: "+student.roll,20,y); y+=10;
+
+ doc.text("Subject",20,y);
+ doc.text("Marks",80,y);
+ doc.text("Pass Mark",110,y);
+ doc.text("Status",150,y);
+ y+=5;
+
+ doc.line(20,y,190,y); y+=5;
+
+ resultRow.marks.forEach((m,i)=>{
+   let pm = test.passMarks[i];
+   let status = m>=pm?"PASS":"FAIL";
+
+   doc.text(test.subjects[i],20,y);
+   doc.text(String(m),80,y);
+   doc.text(String(pm),110,y);
+   doc.text(status,150,y);
+   y+=7;
+ });
+
+ y+=5;
+ doc.text("Total: "+total,20,y); y+=8;
+
+ doc.setFontSize(13);
+ doc.text("FINAL RESULT: "+finalResult,20,y); y+=20;
+
+ doc.setFontSize(11);
+ doc.text("Teacher Signature",20,y);
+ doc.text("Parent Signature",140,y);
+
+ doc.save(student.roll+"_Result.pdf");
 }
 </script>
 
