@@ -50,7 +50,7 @@ button{
  <button onclick="loadStudents()">Load Students</button>
 
  <br><br>
- <button onclick="openProgressPrompt()">📄 Progress Report (2 Students)</button>
+ <button onclick="downloadAllProgressReports()">📄 Download Progress Report (All Students)</button>
 
  <div id="marksBox"></div>
  <hr>
@@ -102,10 +102,7 @@ function parseSubjects(){
 /* ================= LOAD MARK ENTRY ================= */
 function loadStudents(){
  let {subNames}=parseSubjects();
- if(subNames.length===0){
-   alert("Enter subjects correctly");
-   return;
- }
+ if(subNames.length===0){ alert("Enter subjects correctly"); return; }
 
  let html="<h4>Enter Marks</h4>";
  tenthStudents.forEach((stu,i)=>{
@@ -145,10 +142,7 @@ function showBars(){
 
  db.ref("tests").once("value",snap=>{
    let data=snap.val();
-   if(!data){
-     box.innerHTML+="<p>No Results</p>";
-     return;
-   }
+   if(!data){ box.innerHTML+="<p>No Results</p>"; return; }
 
    Object.keys(data).forEach(key=>{
      let t=data[key];
@@ -264,7 +258,7 @@ async function downloadTestPDF(key){
    t.results.forEach((r,i)=>{
      let total=r.marks.reduce((a,b)=>a+b,0);
      let pass=true;
-     r.marks.forEach((m,j)=>{if(m<t.passMarks[j]) pass=false;});
+     r.marks.forEach((m,j)=>{ if(m<t.passMarks[j]) pass=false; });
      let result=pass?"PASS":"FAIL";
      drawRow([i+1,r.roll,r.name,...r.marks,total,result],y);
      y+=rowH;
@@ -275,36 +269,33 @@ async function downloadTestPDF(key){
  });
 }
 
-/* ================= PROGRESS REPORT ================= */
-function openProgressPrompt(){
- let r1=prompt("Enter Roll Number 1");
- let r2=prompt("Enter Roll Number 2");
- if(!r1||!r2){alert("Enter both roll numbers");return;}
- let testKey=localStorage.getItem("selectedTestKey");
- if(!testKey){alert("Select a test first");return;}
- generateProgressPDF(testKey,r1.trim(),r2.trim());
-}
+/* ================= PROGRESS REPORT ALL STUDENTS ================= */
+async function downloadAllProgressReports(){
 
-async function generateProgressPDF(testKey,roll1,roll2){
+ let testKey = localStorage.getItem("selectedTestKey");
+ if(!testKey){ alert("Select a test first"); return; }
+
  const {jsPDF}=window.jspdf;
  const doc=new jsPDF("p","mm","a4");
 
- let testSnap=await db.ref("tests/"+testKey).once("value");
- let test=testSnap.val();
+ // Load test
+ let testSnap = await db.ref("tests/"+testKey).once("value");
+ let test = testSnap.val();
 
- let stuSnap=await db.ref("students/10").once("value");
- let students=Object.values(stuSnap.val()||{});
+ // Load students
+ let stuSnap = await db.ref("students/10").once("value");
+ let students = Object.values(stuSnap.val()||{});
 
- let s1=students.find(s=>s.roll==roll1);
- let s2=students.find(s=>s.roll==roll2);
- if(!s1||!s2){alert("Invalid roll numbers");return;}
+ // Sort by roll number
+ students.sort((a,b)=>a.roll.localeCompare(b.roll));
 
- let r1data=test.results.find(r=>r.roll==roll1);
- let r2data=test.results.find(r=>r.roll==roll2);
- if(!r1data||!r2data){alert("Result not found");return;}
+ let pageYTop = 15;
+ let pageYBottom = 155;
+ let isTop = true;
 
  function drawStudent(student,resultRow,startY){
    let y=startY;
+
    doc.setFontSize(14);
    doc.text("RBS INSTITUTIONS",105,y,{align:"center"}); y+=8;
    doc.text(test.testName+" - Progress Report",105,y,{align:"center"}); y+=10;
@@ -342,11 +333,27 @@ async function generateProgressPDF(testKey,roll1,roll2){
    doc.text("Parent Signature",150,y);
  }
 
- drawStudent(s1,r1data,15);
- doc.line(10,145,200,145);
- drawStudent(s2,r2data,155);
+ // Loop students 2 per page
+ for(let i=0;i<students.length;i++){
 
- doc.save("Progress_"+roll1+"_"+roll2+".pdf");
+   let stu = students[i];
+   let res = test.results.find(r=>r.roll==stu.roll);
+   if(!res) continue;
+
+   if(isTop){
+     drawStudent(stu,res,pageYTop);
+     isTop=false;
+   }else{
+     // divider
+     doc.line(10,145,200,145);
+     drawStudent(stu,res,pageYBottom);
+     isTop=true;
+     doc.addPage();
+   }
+ }
+
+ // If last page had only one student, still save
+ doc.save("All_Progress_Reports.pdf");
 }
 </script>
 
