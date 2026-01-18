@@ -49,7 +49,7 @@ button{
 
 <!-- Admin Panel -->
 <div id="adminPanel" class="adminOnly">
- <h3>Create New Test (10th Class)</h3>
+ <h3>Create / Edit Test (10th Class)</h3>
  <input id="testName" placeholder="Test Name">
  <input id="subjects" placeholder="Subjects (comma separated)">
  <button onclick="loadStudents()">Load Students</button>
@@ -63,9 +63,6 @@ button{
 </div>
 
 <script>
-/* ======================
-   FIREBASE CONFIG
-====================== */
 const firebaseConfig = {
  apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
  authDomain: "rbs-institutions-portal.firebaseapp.com",
@@ -78,24 +75,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-/* ======================
-   ADMIN CHECK
-====================== */
 let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) document.getElementById("adminPanel").style.display="block";
 
-/* ======================
-   LOAD STUDENTS
-====================== */
 let tenthStudents = [];
+let editingTestKey = null; // <-- NEW
+
 db.ref("students/10").once("value",snap=>{
  let data = snap.val() || {};
  tenthStudents = Object.values(data);
 });
 
-/* ======================
-   SHOW TEST BARS
-====================== */
+/* ================= SHOW TEST BARS ================= */
 function showBars(){
  testBars.innerHTML="<h3>Available Tests</h3>";
 
@@ -109,12 +100,16 @@ function showBars(){
    Object.keys(data).forEach(key=>{
      let t = data[key];
      testBars.innerHTML += `
-      <div class="bar" onclick="openStudentResult('${key}')">
-        <span>${t.testName}</span>
+      <div class="bar">
+        <span onclick="openStudentResult('${key}')">${t.testName}</span>
         ${isAdmin?`
         <span>
          <button class="smallbtn"
+           onclick="event.stopPropagation();editTest('${key}')">✏ Edit</button>
+
+         <button class="smallbtn"
            onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
+
          <button onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
         </span>`:""}
       </div>`;
@@ -123,19 +118,15 @@ function showBars(){
 }
 showBars();
 
-/* ======================
-   LOAD STUDENTS FOR MARK ENTRY
-====================== */
+/* ================= LOAD STUDENTS FOR NEW TEST ================= */
 function loadStudents(){
- if(tenthStudents.length===0){
-   marksBox.innerHTML="<p>No Students Found</p>";
-   return;
- }
+ editingTestKey = null; // new test mode
 
  let subs = subjects.value.split(",").map(s=>s.trim()).filter(s=>s);
- if(subs.length===0){ alert("Enter Subjects!"); return; }
+ if(subs.length===0){ alert("Enter Subjects"); return; }
 
  let html="<h4>Enter Marks</h4>";
+
  tenthStudents.forEach((s,i)=>{
    html+=`<b>${s.name} (${s.roll})</b><br>`;
    subs.forEach((sub,j)=>{
@@ -143,16 +134,20 @@ function loadStudents(){
    });
    html+="<hr>";
  });
+
  html+=`<button onclick="saveTest()">Save Test</button>`;
  marksBox.innerHTML=html;
 }
 
-/* ======================
-   SAVE TEST
-====================== */
+/* ================= SAVE NEW TEST ================= */
 function saveTest(){
  let subs = subjects.value.split(",").map(s=>s.trim());
- let obj = { testName:testName.value, subjects:subs, results:[] };
+
+ let obj = {
+   testName: testName.value,
+   subjects: subs,
+   results: []
+ };
 
  tenthStudents.forEach((s,i)=>{
    let marks=[];
@@ -165,14 +160,62 @@ function saveTest(){
  db.ref("tests").push(obj);
  alert("Test Saved!");
  marksBox.innerHTML="";
- testName.value="";
- subjects.value="";
  showBars();
 }
 
-/* ======================
-   DELETE TEST
-====================== */
+/* ================= EDIT EXISTING TEST ================= */
+function editTest(key){
+ editingTestKey = key;
+
+ db.ref("tests/"+key).once("value",snap=>{
+   let t = snap.val();
+
+   testName.value = t.testName;
+   subjects.value = t.subjects.join(",");
+
+   let html="<h4>Edit Marks</h4>";
+
+   tenthStudents.forEach((s,i)=>{
+     html+=`<b>${s.name} (${s.roll})</b><br>`;
+     t.subjects.forEach((sub,j)=>{
+       let oldMarks = t.results.find(r=>r.roll==s.roll)?.marks[j] || 0;
+       html+=`${sub}: <input id="m${i}_${j}" value="${oldMarks}" size="4"><br>`;
+     });
+     html+="<hr>";
+   });
+
+   html+=`<button onclick="updateTest()">Update Test</button>`;
+   marksBox.innerHTML=html;
+ });
+}
+
+/* ================= UPDATE TEST ================= */
+function updateTest(){
+ let subs = subjects.value.split(",").map(s=>s.trim());
+
+ let obj = {
+   testName: testName.value,
+   subjects: subs,
+   results: []
+ };
+
+ tenthStudents.forEach((s,i)=>{
+   let marks=[];
+   subs.forEach((_,j)=>{
+     marks.push(Number(document.getElementById(`m${i}_${j}`).value || 0));
+   });
+   obj.results.push({roll:s.roll,name:s.name,marks});
+ });
+
+ db.ref("tests/"+editingTestKey).set(obj);
+
+ alert("Test Updated Successfully!");
+ marksBox.innerHTML="";
+ editingTestKey = null;
+ showBars();
+}
+
+/* ================= DELETE ================= */
 function deleteTest(key){
  if(confirm("Delete this test?")){
    db.ref("tests/"+key).remove();
@@ -180,17 +223,13 @@ function deleteTest(key){
  }
 }
 
-/* ======================
-   OPEN RESULT PAGE
-====================== */
+/* ================= OPEN STUDENT RESULT ================= */
 function openStudentResult(key){
  localStorage.setItem("selectedTestKey",key);
  location.href="services.html";
 }
 
-/* ======================
-   PERFECT TABLE PDF
-====================== */
+/* ================= PDF DOWNLOAD ================= */
 async function downloadTestPDF(key){
  const { jsPDF } = window.jspdf;
  const doc = new jsPDF("p","mm","a4");
@@ -198,54 +237,42 @@ async function downloadTestPDF(key){
  db.ref("tests/"+key).once("value",snap=>{
    let t = snap.val();
 
-   // Header
    doc.setFontSize(18);
    doc.text("RBS INSTITUTIONS",105,15,{align:"center"});
    doc.setFontSize(14);
    doc.text(t.testName+" - Marks Report",105,23,{align:"center"});
    doc.line(10,28,200,28);
 
-   // ---- Column widths ----
-   let colWidths = [10, 28, 45]; 
+   let colWidths=[10,28,45];
    t.subjects.forEach(()=>colWidths.push(18));
-   colWidths.push(18); // Total
-   colWidths.push(20); // Result
+   colWidths.push(18,20);
 
-   let headers = ["S.No","Roll No","Name",...t.subjects,"Total","Result"];
+   let headers=["S.No","Roll No","Name",...t.subjects,"Total","Result"];
 
-   let startX = 10;
-   let startY = 35;
-   let rowH = 8;
+   let startX=10, startY=35, rowH=8;
 
    function drawRow(row,y){
-     let x = startX;
+     let x=startX;
      row.forEach((cell,i)=>{
        doc.rect(x,y,colWidths[i],rowH);
-       doc.text(String(cell), x+2, y+5);
-       x += colWidths[i];
+       doc.text(String(cell),x+2,y+5);
+       x+=colWidths[i];
      });
    }
 
-   // Header row
    drawRow(headers,startY);
 
-   // Data rows
-   let y = startY + rowH;
+   let y=startY+rowH;
+
    t.results.forEach((r,i)=>{
-     let total = r.marks.reduce((a,b)=>a+b,0);
-     let result = total >= 35 ? "PASS" : "FAIL";
-
-     let row = [i+1, r.roll, r.name, ...r.marks, total, result];
+     let total=r.marks.reduce((a,b)=>a+b,0);
+     let result = total>=35 ? "PASS":"FAIL";
+     let row=[i+1,r.roll,r.name,...r.marks,total,result];
      drawRow(row,y);
-     y += rowH;
-
-     if(y > 280){
-       doc.addPage();
-       y = 20;
-     }
+     y+=rowH;
+     if(y>280){doc.addPage();y=20;}
    });
 
-   // Save PDF
    doc.save(t.testName+"_Results.pdf");
  });
 }
