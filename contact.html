@@ -84,7 +84,7 @@ function parseSubjects(){
  return {subNames, passMarks};
 }
 
-/* ================= LOAD STUDENTS FOR ENTRY ================= */
+/* ================= LOAD STUDENTS FOR MARK ENTRY ================= */
 function loadStudents(){
  let {subNames} = parseSubjects();
  if(subNames.length===0){ alert("Enter subjects correctly"); return; }
@@ -121,7 +121,7 @@ function saveTest(){
  });
 
  db.ref("tests").push(obj);
- alert("Test Saved!");
+ alert("Test Saved Successfully!");
  document.getElementById("marksBox").innerHTML="";
  showBars();
 }
@@ -138,13 +138,19 @@ function showBars(){
    Object.keys(data).forEach(key=>{
      let t=data[key];
      box.innerHTML += `
-      <div class="bar">
+      <div class="bar" onclick="openStudentResult('${key}')">
         <span>${t.testName}</span>
+
         ${isAdmin?`
         <span>
-          <button class="smallbtn" onclick="editTest('${key}')">✏ Edit</button>
-          <button class="smallbtn" onclick="downloadTestPDF('${key}')">📄 PDF</button>
-          <button onclick="deleteTest('${key}')">❌</button>
+          <button class="smallbtn"
+            onclick="event.stopPropagation();editTest('${key}')">✏ Edit</button>
+
+          <button class="smallbtn"
+            onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
+
+          <button
+            onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
         </span>`:""}
       </div>`;
    });
@@ -195,7 +201,7 @@ function updateTest(key){
  });
 
  db.ref("tests/"+key).set(obj);
- alert("Test Updated!");
+ alert("Test Updated Successfully!");
  document.getElementById("marksBox").innerHTML="";
  showBars();
 }
@@ -208,10 +214,16 @@ function deleteTest(key){
  }
 }
 
+/* ================= OPEN STUDENT RESULT PAGE ================= */
+function openStudentResult(key){
+ localStorage.setItem("selectedTestKey", key);
+ location.href = "services.html"; 
+}
+
 /* ================= PDF DOWNLOAD ================= */
 async function downloadTestPDF(key){
  const {jsPDF}=window.jspdf;
- const doc=new jsPDF("l","mm","a4"); // Landscape
+ const doc=new jsPDF("l","mm","a4");
 
  db.ref("tests/"+key).once("value",snap=>{
    let t=snap.val();
