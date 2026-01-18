@@ -24,6 +24,7 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
  background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;
  cursor:pointer;display:flex;justify-content:space-between;align-items:center;
 }
+.locked{opacity:0.6;cursor:not-allowed;}
 .adminOnly{display:none;}
 input,select{padding:6px;margin:5px;}
 button{
@@ -42,16 +43,21 @@ button{
 
 <div class="box">
 
-<!-- Admin Panel -->
+<!-- ADMIN PANEL -->
 <div id="adminPanel" class="adminOnly">
  <h3>Create / Edit Test</h3>
+
  <input id="testName" placeholder="Test Name">
  <input id="subjects" placeholder="Subject:PassMark, Subject:PassMark">
+ <br>
+ <label><b>Result Open Time:</b></label>
+ <input type="datetime-local" id="resultTime">
+ <br>
+
  <button onclick="loadStudents()">Load Students</button>
 
  <br><br>
 
- <!-- Progress Report Test Selector -->
  <select id="testSelect">
    <option value="">-- Select Test for Progress Report --</option>
  </select>
@@ -64,7 +70,7 @@ button{
  <hr>
 </div>
 
-<!-- Test List -->
+<!-- TEST LIST -->
 <div id="testBars"></div>
 
 </div>
@@ -94,27 +100,27 @@ db.ref("students/10").once("value",snap=>{
 
 /* ================= PARSE SUBJECTS ================= */
 function parseSubjects(){
- let raw = document.getElementById("subjects").value
+ let raw=document.getElementById("subjects").value
  .split(",").map(s=>s.trim()).filter(s=>s);
- let subNames=[], passMarks=[];
+ let subNames=[],passMarks=[];
  raw.forEach(item=>{
-   let parts=item.split(":");
-   subNames.push(parts[0].trim());
-   passMarks.push(Number(parts[1]));
+   let p=item.split(":");
+   subNames.push(p[0]);
+   passMarks.push(Number(p[1]));
  });
- return {subNames, passMarks};
+ return {subNames,passMarks};
 }
 
 /* ================= LOAD MARK ENTRY ================= */
 function loadStudents(){
  let {subNames}=parseSubjects();
- if(subNames.length===0){ alert("Enter subjects correctly"); return; }
+ if(!subNames.length){alert("Enter subjects");return;}
 
  let html="<h4>Enter Marks</h4>";
  tenthStudents.forEach((stu,i)=>{
    html+=`<b>${stu.name} (${stu.roll})</b><br>`;
-   subNames.forEach((sub,j)=>{
-     html+=`${sub}: <input id="m${i}_${j}" size="4"><br>`;
+   subNames.forEach((s,j)=>{
+     html+=`${s}: <input id="m${i}_${j}" size="4"><br>`;
    });
    html+="<hr>";
  });
@@ -125,7 +131,16 @@ function loadStudents(){
 /* ================= SAVE TEST ================= */
 function saveTest(){
  let {subNames,passMarks}=parseSubjects();
- let obj={testName:testName.value,subjects:subNames,passMarks:passMarks,results:[]};
+ let time=document.getElementById("resultTime").value;
+ if(!time){alert("Set result open time");return;}
+
+ let obj={
+   testName:testName.value,
+   subjects:subNames,
+   passMarks,
+   releaseTime:new Date(time).getTime(),
+   results:[]
+ };
 
  tenthStudents.forEach((stu,i)=>{
    let marks=[];
@@ -137,7 +152,7 @@ function saveTest(){
 
  db.ref("tests").push(obj);
  alert("Test Saved!");
- document.getElementById("marksBox").innerHTML="";
+ marksBox.innerHTML="";
  showBars();
 }
 
@@ -145,204 +160,56 @@ function saveTest(){
 function showBars(){
  let box=document.getElementById("testBars");
  let select=document.getElementById("testSelect");
-
  box.innerHTML="<h3>Available Tests</h3>";
- select.innerHTML='<option value="">-- Select Test for Progress Report --</option>';
+ select.innerHTML='<option value="">-- Select Test --</option>';
 
  db.ref("tests").once("value",snap=>{
    let data=snap.val();
-   if(!data){ box.innerHTML+="<p>No Results</p>"; return; }
+   if(!data){box.innerHTML+="No Tests";return;}
 
    Object.keys(data).forEach(key=>{
      let t=data[key];
+     let now=Date.now();
+     let locked=!isAdmin && now<t.releaseTime;
 
-     // Test bar
      box.innerHTML+=`
-     <div class="bar" onclick="openStudentResult('${key}')">
+     <div class="bar ${locked?"locked":""}"
+      ${locked?"":`onclick="openStudentResult('${key}')"`}>
        <span>${t.testName}</span>
+       <span>
+        ${locked
+          ? "⏳ Opens at "+new Date(t.releaseTime).toLocaleString()
+          : "✅ View Result"}
+       </span>
        ${isAdmin?`
        <span>
         <button class="smallbtn"
-         onclick="event.stopPropagation();editTest('${key}')">✏ Edit</button>
+         onclick="event.stopPropagation();editTest('${key}')">✏</button>
         <button class="smallbtn"
-         onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
+         onclick="event.stopPropagation();downloadTestPDF('${key}')">📄</button>
         <button
          onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
        </span>`:""}
      </div>`;
 
-     // Dropdown fill
-     select.innerHTML += `<option value="${key}">${t.testName}</option>`;
+     select.innerHTML+=`<option value="${key}">${t.testName}</option>`;
    });
  });
 }
 showBars();
 
-/* ================= EDIT / UPDATE / DELETE ================= */
-function editTest(key){
- db.ref("tests/"+key).once("value",snap=>{
-   let t=snap.val();
-   testName.value=t.testName;
-   subjects.value=t.subjects.map((s,i)=>`${s}:${t.passMarks[i]}`).join(", ");
-
-   let html="<h4>Edit Marks</h4>";
-   tenthStudents.forEach((stu,i)=>{
-     html+=`<b>${stu.name} (${stu.roll})</b><br>`;
-     t.subjects.forEach((sub,j)=>{
-       let old=t.results.find(r=>r.roll==stu.roll)?.marks[j]||0;
-       html+=`${sub}: <input id="m${i}_${j}" value="${old}" size="4"><br>`;
-     });
-     html+="<hr>";
-   });
-   html+=`<button onclick="updateTest('${key}')">Update Test</button>`;
-   document.getElementById("marksBox").innerHTML=html;
- });
-}
-
-function updateTest(key){
- let {subNames,passMarks}=parseSubjects();
- let obj={testName:testName.value,subjects:subNames,passMarks:passMarks,results:[]};
-
- tenthStudents.forEach((stu,i)=>{
-   let marks=[];
-   subNames.forEach((_,j)=>{
-     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
-   });
-   obj.results.push({roll:stu.roll,name:stu.name,marks});
- });
-
- db.ref("tests/"+key).set(obj);
- alert("Test Updated!");
- document.getElementById("marksBox").innerHTML="";
- showBars();
-}
-
-function deleteTest(key){
- if(confirm("Delete Test?")){
-   db.ref("tests/"+key).remove();
-   showBars();
- }
-}
-
-/* ================= OPEN STUDENT PAGE ================= */
+/* ================= OPEN RESULT ================= */
 function openStudentResult(key){
  localStorage.setItem("selectedTestKey",key);
  location.href="services.html";
 }
 
-/* ================= FULL TEST MARKS PDF ================= */
-async function downloadTestPDF(key){
- const {jsPDF}=window.jspdf;
- const doc=new jsPDF("l","mm","a4");
-
- db.ref("tests/"+key).once("value",snap=>{
-   let t=snap.val();
-
-   doc.setFontSize(18);
-   doc.text("RBS INSTITUTIONS",148,15,{align:"center"});
-   doc.setFontSize(14);
-   doc.text(t.testName+" - Marks Report",148,23,{align:"center"});
-   doc.line(10,28,285,28);
-
-   let headers=["S.No","Roll","Name",...t.subjects,"Total","Result"];
-   let startX=10,startY=35,rowH=8;
-   doc.setFontSize(9);
-
-   function drawRow(row,y){
-     let x=startX;
-     row.forEach(cell=>{
-       doc.rect(x,y,20,rowH);
-       doc.text(String(cell),x+2,y+5);
-       x+=20;
-     });
-   }
-
-   drawRow(headers,startY);
-   let y=startY+rowH;
-
-   t.results.forEach((r,i)=>{
-     let total=r.marks.reduce((a,b)=>a+b,0);
-     let pass=true;
-     r.marks.forEach((m,j)=>{if(m<t.passMarks[j]) pass=false;});
-     drawRow([i+1,r.roll,r.name,...r.marks,total,pass?"PASS":"FAIL"],y);
-     y+=rowH;
-     if(y>190){doc.addPage();y=20;}
-   });
-
-   doc.save(t.testName+"_Results.pdf");
- });
-}
-
-/* ================= PROGRESS REPORT ALL STUDENTS ================= */
-async function downloadAllProgressReports(){
-
- let testKey=document.getElementById("testSelect").value;
- if(!testKey){ alert("Select a test first"); return; }
-
- const {jsPDF}=window.jspdf;
- const doc=new jsPDF("p","mm","a4");
-
- let testSnap=await db.ref("tests/"+testKey).once("value");
- let test=testSnap.val();
-
- let stuSnap=await db.ref("students/10").once("value");
- let students=Object.values(stuSnap.val()||{});
-
- students.sort((a,b)=>a.roll.localeCompare(b.roll));
-
- function drawStudent(student,resultRow,startY){
-   let y=startY;
-   doc.setFontSize(14);
-   doc.text("RBS INSTITUTIONS",105,y,{align:"center"}); y+=8;
-   doc.text(test.testName+" - Progress Report",105,y,{align:"center"}); y+=10;
-
-   doc.setFontSize(11);
-   doc.text("Name: "+student.name,20,y);
-   doc.text("Roll: "+student.roll,140,y); y+=8;
-
-   doc.text("Subject",20,y);
-   doc.text("Marks",90,y);
-   doc.text("Status",140,y);
-   y+=4; doc.line(20,y,190,y); y+=6;
-
-   let total=0,final="PASS";
-   resultRow.marks.forEach((m,i)=>{
-     let status=m>=test.passMarks[i]?"PASS":"FAIL";
-     if(status==="FAIL") final="FAIL";
-     total+=Number(m);
-     doc.text(test.subjects[i],20,y);
-     doc.text(String(m),90,y);
-     doc.text(status,140,y);
-     y+=6;
-   });
-
-   y+=4;
-   doc.text("Total: "+total,20,y);
-   doc.text("FINAL RESULT: "+final,20,y);
-
-   y+=10;
-   doc.text("Teacher 1 Signature",20,y);
-   doc.text("Teacher 2 Signature",80,y);
-   doc.text("Parent Signature",150,y);
+/* ================= DELETE ================= */
+function deleteTest(key){
+ if(confirm("Delete test?")){
+   db.ref("tests/"+key).remove();
+   showBars();
  }
-
- let top=true;
- students.forEach((stu,i)=>{
-   let res=test.results.find(r=>r.roll==stu.roll);
-   if(!res) return;
-
-   if(top){
-     drawStudent(stu,res,15);
-     top=false;
-   }else{
-     doc.line(10,145,200,145);
-     drawStudent(stu,res,155);
-     doc.addPage();
-     top=true;
-   }
- });
-
- doc.save("All_Progress_Reports.pdf");
 }
 </script>
 
