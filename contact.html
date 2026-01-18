@@ -11,30 +11,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
+/* same CSS as before */
 body{font-family:Arial;background:#eef2f3;margin:0;}
-.header{
- background:#0b5394;color:white;padding:15px;
- display:flex;justify-content:space-between;align-items:center;
-}
-.box{
- background:white;width:900px;margin:30px auto;
- padding:20px;border-radius:10px;
- box-shadow:0 0 12px #999;
- text-align:center;
-}
-.bar{
- background:#cfe2f3;
- padding:12px;margin:8px;border-radius:6px;
- cursor:pointer;
- display:flex;justify-content:space-between;align-items:center;
-}
+.header{background:#0b5394;color:white;padding:15px;display:flex;justify-content:space-between;align-items:center;}
+.box{background:white;width:900px;margin:30px auto;padding:20px;border-radius:10px;box-shadow:0 0 12px #999;text-align:center;}
+.bar{background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
 .adminOnly{display:none;}
 input{padding:6px;margin:5px;}
-button{
- background:#990000;color:white;
- border:none;padding:6px 12px;
- border-radius:5px;cursor:pointer;
-}
+button{background:#990000;color:white;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;}
 .smallbtn{background:#0b5394;margin-left:5px;}
 </style>
 </head>
@@ -47,228 +31,204 @@ button{
 
 <div class="box">
 
-<!-- Admin Panel -->
 <div id="adminPanel" class="adminOnly">
- <h3>Create / Edit Test (10th Class)</h3>
+ <h3>Create / Edit Test</h3>
  <input id="testName" placeholder="Test Name">
- <input id="subjects" placeholder="Subjects (comma separated)">
+ <input id="subjects" placeholder="Subject:PassMark, Subject:PassMark">
  <button onclick="loadStudents()">Load Students</button>
  <div id="marksBox"></div>
  <hr>
 </div>
 
-<!-- Test Bars -->
 <div id="testBars"></div>
 
 </div>
 
 <script>
-const firebaseConfig = {
- apiKey: "AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
- authDomain: "rbs-institutions-portal.firebaseapp.com",
- databaseURL: "https://rbs-institutions-portal-default-rtdb.firebaseio.com",
- projectId: "rbs-institutions-portal",
- messagingSenderId: "881467222162",
- appId: "1:881467222162:web:7acd765c4f7490ea6b9e4b"
-};
-
+const firebaseConfig={/* your same firebase config */};
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const db=firebase.database();
 
-let isAdmin = localStorage.getItem("isAdmin")==="true";
-if(isAdmin) document.getElementById("adminPanel").style.display="block";
+let isAdmin=localStorage.getItem("isAdmin")==="true";
+if(isAdmin) adminPanel.style.display="block";
 
-let tenthStudents = [];
-let editingTestKey = null; // <-- NEW
+let tenthStudents=[];
+let editingTestKey=null;
 
 db.ref("students/10").once("value",snap=>{
- let data = snap.val() || {};
- tenthStudents = Object.values(data);
+ tenthStudents=Object.values(snap.val()||{});
 });
 
-/* ================= SHOW TEST BARS ================= */
-function showBars(){
- testBars.innerHTML="<h3>Available Tests</h3>";
-
- db.ref("tests").once("value", snap=>{
-   let data = snap.val();
-   if(!data){
-     testBars.innerHTML+="<p>No Results Available</p>";
-     return;
-   }
-
-   Object.keys(data).forEach(key=>{
-     let t = data[key];
-     testBars.innerHTML += `
-      <div class="bar">
-        <span onclick="openStudentResult('${key}')">${t.testName}</span>
-        ${isAdmin?`
-        <span>
-         <button class="smallbtn"
-           onclick="event.stopPropagation();editTest('${key}')">✏ Edit</button>
-
-         <button class="smallbtn"
-           onclick="event.stopPropagation();downloadTestPDF('${key}')">📄 PDF</button>
-
-         <button onclick="event.stopPropagation();deleteTest('${key}')">❌</button>
-        </span>`:""}
-      </div>`;
-   });
+/* ---------- Parse Subject + Pass Mark ---------- */
+function parseSubjects(){
+ let arr = subjects.value.split(",").map(s=>s.trim()).filter(s=>s);
+ let subNames=[], passMarks=[];
+ arr.forEach(item=>{
+   let parts=item.split(":");
+   subNames.push(parts[0].trim());
+   passMarks.push(Number(parts[1]));
  });
+ return {subNames, passMarks};
 }
-showBars();
 
-/* ================= LOAD STUDENTS FOR NEW TEST ================= */
+/* ---------- LOAD STUDENTS ---------- */
 function loadStudents(){
- editingTestKey = null; // new test mode
-
- let subs = subjects.value.split(",").map(s=>s.trim()).filter(s=>s);
- if(subs.length===0){ alert("Enter Subjects"); return; }
+ editingTestKey=null;
+ let {subNames}=parseSubjects();
+ if(subNames.length==0){alert("Enter subjects");return;}
 
  let html="<h4>Enter Marks</h4>";
-
  tenthStudents.forEach((s,i)=>{
    html+=`<b>${s.name} (${s.roll})</b><br>`;
-   subs.forEach((sub,j)=>{
+   subNames.forEach((sub,j)=>{
      html+=`${sub}: <input id="m${i}_${j}" size="4"><br>`;
    });
    html+="<hr>";
  });
-
  html+=`<button onclick="saveTest()">Save Test</button>`;
  marksBox.innerHTML=html;
 }
 
-/* ================= SAVE NEW TEST ================= */
+/* ---------- SAVE TEST ---------- */
 function saveTest(){
- let subs = subjects.value.split(",").map(s=>s.trim());
+ let {subNames,passMarks}=parseSubjects();
 
- let obj = {
-   testName: testName.value,
-   subjects: subs,
-   results: []
+ let obj={
+   testName:testName.value,
+   subjects:subNames,
+   passMarks:passMarks,
+   results:[]
  };
 
  tenthStudents.forEach((s,i)=>{
    let marks=[];
-   subs.forEach((_,j)=>{
-     marks.push(Number(document.getElementById(`m${i}_${j}`).value || 0));
+   subNames.forEach((_,j)=>{
+     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
    });
    obj.results.push({roll:s.roll,name:s.name,marks});
  });
 
  db.ref("tests").push(obj);
- alert("Test Saved!");
+ alert("Saved!");
  marksBox.innerHTML="";
  showBars();
 }
 
-/* ================= EDIT EXISTING TEST ================= */
+/* ---------- SHOW TEST BARS ---------- */
+function showBars(){
+ testBars.innerHTML="<h3>Available Tests</h3>";
+ db.ref("tests").once("value",snap=>{
+   let data=snap.val();
+   if(!data){testBars.innerHTML+="<p>No Results</p>";return;}
+   Object.keys(data).forEach(key=>{
+     let t=data[key];
+     testBars.innerHTML+=`
+     <div class="bar">
+      <span>${t.testName}</span>
+      ${isAdmin?`<span>
+       <button class="smallbtn" onclick="editTest('${key}')">✏</button>
+       <button class="smallbtn" onclick="downloadTestPDF('${key}')">📄</button>
+       <button onclick="deleteTest('${key}')">❌</button>
+      </span>`:""}
+     </div>`;
+   });
+ });
+}
+showBars();
+
+/* ---------- EDIT ---------- */
 function editTest(key){
- editingTestKey = key;
-
+ editingTestKey=key;
  db.ref("tests/"+key).once("value",snap=>{
-   let t = snap.val();
-
-   testName.value = t.testName;
-   subjects.value = t.subjects.join(",");
+   let t=snap.val();
+   testName.value=t.testName;
+   subjects.value = t.subjects.map((s,i)=>`${s}:${t.passMarks[i]}`).join(", ");
 
    let html="<h4>Edit Marks</h4>";
-
-   tenthStudents.forEach((s,i)=>{
-     html+=`<b>${s.name} (${s.roll})</b><br>`;
+   tenthStudents.forEach((stu,i)=>{
+     html+=`<b>${stu.name} (${stu.roll})</b><br>`;
      t.subjects.forEach((sub,j)=>{
-       let oldMarks = t.results.find(r=>r.roll==s.roll)?.marks[j] || 0;
-       html+=`${sub}: <input id="m${i}_${j}" value="${oldMarks}" size="4"><br>`;
+       let old = t.results.find(r=>r.roll==stu.roll)?.marks[j]||0;
+       html+=`${sub}: <input id="m${i}_${j}" value="${old}" size="4"><br>`;
      });
      html+="<hr>";
    });
-
-   html+=`<button onclick="updateTest()">Update Test</button>`;
+   html+=`<button onclick="updateTest()">Update</button>`;
    marksBox.innerHTML=html;
  });
 }
 
-/* ================= UPDATE TEST ================= */
+/* ---------- UPDATE ---------- */
 function updateTest(){
- let subs = subjects.value.split(",").map(s=>s.trim());
+ let {subNames,passMarks}=parseSubjects();
 
- let obj = {
-   testName: testName.value,
-   subjects: subs,
-   results: []
+ let obj={
+   testName:testName.value,
+   subjects:subNames,
+   passMarks:passMarks,
+   results:[]
  };
 
  tenthStudents.forEach((s,i)=>{
    let marks=[];
-   subs.forEach((_,j)=>{
-     marks.push(Number(document.getElementById(`m${i}_${j}`).value || 0));
+   subNames.forEach((_,j)=>{
+     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
    });
    obj.results.push({roll:s.roll,name:s.name,marks});
  });
 
  db.ref("tests/"+editingTestKey).set(obj);
-
- alert("Test Updated Successfully!");
+ alert("Updated!");
  marksBox.innerHTML="";
- editingTestKey = null;
  showBars();
 }
 
-/* ================= DELETE ================= */
+/* ---------- DELETE ---------- */
 function deleteTest(key){
- if(confirm("Delete this test?")){
-   db.ref("tests/"+key).remove();
-   showBars();
- }
+ if(confirm("Delete?")) db.ref("tests/"+key).remove(),showBars();
 }
 
-/* ================= OPEN STUDENT RESULT ================= */
-function openStudentResult(key){
- localStorage.setItem("selectedTestKey",key);
- location.href="services.html";
-}
-
-/* ================= PDF DOWNLOAD ================= */
+/* ---------- PDF ---------- */
 async function downloadTestPDF(key){
- const { jsPDF } = window.jspdf;
- const doc = new jsPDF("p","mm","a4");
+ const {jsPDF}=window.jspdf;
+ const doc=new jsPDF();
 
  db.ref("tests/"+key).once("value",snap=>{
-   let t = snap.val();
+   let t=snap.val();
 
-   doc.setFontSize(18);
    doc.text("RBS INSTITUTIONS",105,15,{align:"center"});
-   doc.setFontSize(14);
    doc.text(t.testName+" - Marks Report",105,23,{align:"center"});
-   doc.line(10,28,200,28);
 
-   let colWidths=[10,28,45];
-   t.subjects.forEach(()=>colWidths.push(18));
-   colWidths.push(18,20);
+   let colW=[10,28,45];
+   t.subjects.forEach(()=>colW.push(18));
+   colW.push(18,20);
 
-   let headers=["S.No","Roll No","Name",...t.subjects,"Total","Result"];
+   let head=["S.No","Roll","Name",...t.subjects,"Total","Result"];
+   let x=10,y=35,rowH=8;
 
-   let startX=10, startY=35, rowH=8;
-
-   function drawRow(row,y){
-     let x=startX;
-     row.forEach((cell,i)=>{
-       doc.rect(x,y,colWidths[i],rowH);
-       doc.text(String(cell),x+2,y+5);
-       x+=colWidths[i];
+   function row(r,y){
+     let xPos=x;
+     r.forEach((c,i)=>{
+       doc.rect(xPos,y,colW[i],rowH);
+       doc.text(String(c),xPos+2,y+5);
+       xPos+=colW[i];
      });
    }
 
-   drawRow(headers,startY);
-
-   let y=startY+rowH;
+   row(head,y);
+   y+=rowH;
 
    t.results.forEach((r,i)=>{
      let total=r.marks.reduce((a,b)=>a+b,0);
-     let result = total>=35 ? "PASS":"FAIL";
-     let row=[i+1,r.roll,r.name,...r.marks,total,result];
-     drawRow(row,y);
+
+     // ---- PASS / FAIL PER SUBJECT ----
+     let pass=true;
+     r.marks.forEach((m,j)=>{
+       if(m < t.passMarks[j]) pass=false;
+     });
+
+     let result = pass ? "PASS" : "FAIL";
+     row([i+1,r.roll,r.name,...r.marks,total,result],y);
      y+=rowH;
      if(y>280){doc.addPage();y=20;}
    });
