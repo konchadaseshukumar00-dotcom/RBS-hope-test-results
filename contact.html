@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <title>Results</title>
@@ -22,7 +22,7 @@ body{font-family:Arial;background:#eef2f3;margin:0;}
 }
 .bar{
  background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;
- cursor:pointer;display:flex;justify-content:space-between;align-items:center;
+ display:flex;justify-content:space-between;align-items:center;
 }
 .locked{opacity:.6;cursor:not-allowed;}
 .adminOnly{display:none;}
@@ -169,8 +169,8 @@ function showBars(){
      let locked=!isAdmin && Date.now()<t.releaseTime;
 
      box.innerHTML+=`
-     <div class="bar ${locked?"locked":""}"
-      ${locked?"":`onclick="openStudentResult('${key}')"`}>
+     <div class="bar ${locked && !isAdmin ? "locked" : ""}"
+      ${(!locked || isAdmin) ? `onclick="openStudentResult('${key}')"` : ""}>
        <span>${t.testName}</span>
        <span>
          ${locked
@@ -254,6 +254,116 @@ function deleteTest(key){
 function openStudentResult(key){
  localStorage.setItem("selectedTestKey",key);
  location.href="services.html";
+}
+
+/* ================= FULL TEST MARKS PDF ================= */
+async function downloadTestPDF(key){
+ const {jsPDF}=window.jspdf;
+ const doc=new jsPDF("l","mm","a4");
+
+ db.ref("tests/"+key).once("value",snap=>{
+   let t=snap.val();
+
+   doc.setFontSize(18);
+   doc.text("RBS INSTITUTIONS",148,15,{align:"center"});
+   doc.setFontSize(14);
+   doc.text(t.testName+" - Marks Report",148,23,{align:"center"});
+   doc.line(10,28,285,28);
+
+   let headers=["S.No","Roll","Name",...t.subjects,"Total","Result"];
+   let startX=10,startY=35,rowH=8;
+   doc.setFontSize(9);
+
+   function drawRow(row,y){
+     let x=startX;
+     row.forEach(cell=>{
+       doc.rect(x,y,20,rowH);
+       doc.text(String(cell),x+2,y+5);
+       x+=20;
+     });
+   }
+
+   drawRow(headers,startY);
+   let y=startY+rowH;
+
+   t.results.forEach((r,i)=>{
+     let total=r.marks.reduce((a,b)=>a+b,0);
+     let pass=true;
+     r.marks.forEach((m,j)=>{if(m<t.passMarks[j]) pass=false;});
+     drawRow([i+1,r.roll,r.name,...r.marks,total,pass?"PASS":"FAIL"],y);
+     y+=rowH;
+     if(y>190){doc.addPage();y=20;}
+   });
+
+   doc.save(t.testName+"_Results.pdf");
+ });
+}
+
+/* ================= PROGRESS REPORT ALL STUDENTS ================= */
+async function downloadAllProgressReports(){
+ let testKey=testSelect.value;
+ if(!testKey){alert("Select test");return;}
+
+ const {jsPDF}=window.jspdf;
+ const doc=new jsPDF("p","mm","a4");
+
+ let testSnap=await db.ref("tests/"+testKey).once("value");
+ let test=testSnap.val();
+
+ let stuSnap=await db.ref("students/10").once("value");
+ let students=Object.values(stuSnap.val()||{});
+ students.sort((a,b)=>a.roll.localeCompare(b.roll));
+
+ function drawStudent(student,res,y){
+   doc.setFontSize(14);
+   doc.text("RBS INSTITUTIONS",105,y,{align:"center"}); y+=8;
+   doc.text(test.testName+" - Progress Report",105,y,{align:"center"}); y+=10;
+
+   doc.setFontSize(11);
+   doc.text("Name: "+student.name,20,y);
+   doc.text("Roll: "+student.roll,140,y); y+=8;
+
+   doc.text("Subject",20,y);
+   doc.text("Marks",90,y);
+   doc.text("Status",140,y);
+   y+=4; doc.line(20,y,190,y); y+=6;
+
+   let total=0,final="PASS";
+   res.marks.forEach((m,i)=>{
+     let status=m>=test.passMarks[i]?"PASS":"FAIL";
+     if(status==="FAIL") final="FAIL";
+     total+=Number(m);
+     doc.text(test.subjects[i],20,y);
+     doc.text(String(m),90,y);
+     doc.text(status,140,y);
+     y+=6;
+   });
+
+   y+=4;
+   doc.text("Total: "+total,20,y);
+   doc.text("FINAL RESULT: "+final,20,y);
+
+   y+=10;
+   doc.text("Teacher 1 Signature",20,y);
+   doc.text("Teacher 2 Signature",80,y);
+   doc.text("Parent Signature",150,y);
+ }
+
+ let top=true;
+ students.forEach(stu=>{
+   let res=test.results.find(r=>r.roll==stu.roll);
+   if(!res) return;
+
+   if(top){ drawStudent(stu,res,15); top=false; }
+   else{
+     doc.line(10,145,200,145);
+     drawStudent(stu,res,155);
+     doc.addPage();
+     top=true;
+   }
+ });
+
+ doc.save("All_Progress_Reports.pdf");
 }
 </script>
 
