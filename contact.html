@@ -3,18 +3,15 @@
 <head>
 <title>RBS Results</title>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
-<!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body{font-family:Arial;background:#eef2f3;margin:0}
 .header{background:#0b5394;color:white;padding:15px;display:flex;justify-content:space-between}
 .box{background:white;width:900px;margin:30px auto;padding:20px;border-radius:10px;box-shadow:0 0 12px #999}
-.bar{background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between}
+.bar{background:#cfe2f3;padding:12px;margin:8px;border-radius:6px;display:flex;justify-content:space-between;align-items:center}
 .adminOnly{display:none}
 button{background:#990000;color:white;border:none;padding:6px 12px;border-radius:5px;cursor:pointer}
 .smallbtn{background:#0b5394;margin-left:5px}
@@ -31,7 +28,6 @@ input,select{padding:6px;margin:5px}
 
 <div class="box">
 
-<!-- ADMIN PANEL -->
 <div id="adminPanel" class="adminOnly">
 <h3>Create / Edit Test</h3>
 
@@ -40,10 +36,9 @@ input,select{padding:6px;margin:5px}
 <br>
 <label>Result Release Time:</label>
 <input type="datetime-local" id="resultTime">
-
 <br><br>
-<button onclick="loadStudents()">Load Students (New Test)</button>
 
+<button onclick="loadStudents()">Load Students (New Test)</button>
 <div id="marksBox"></div>
 <hr>
 
@@ -53,79 +48,77 @@ input,select{padding:6px;margin:5px}
 <button onclick="downloadAllProgressReports()">📄 Download Progress Reports</button>
 </div>
 
-<!-- TEST LIST -->
 <div id="testBars"></div>
-
 </div>
 
 <script>
-/* ================= FIREBASE ================= */
+/* ---------- Firebase ---------- */
 firebase.initializeApp({
  apiKey:"AIzaSyDGMYTX20mKna9VGddgi6mCIyJkCgbJ7bA",
  databaseURL:"https://rbs-institutions-portal-default-rtdb.firebaseio.com"
 });
 const db = firebase.database();
 
-/* ================= ADMIN ================= */
+/* ---------- Admin ---------- */
 let isAdmin = localStorage.getItem("isAdmin")==="true";
 if(isAdmin) adminPanel.style.display="block";
 
-/* ================= STUDENTS ================= */
-let tenthStudents = [];
-db.ref("students/10").once("value",snap=>{
- tenthStudents = Object.values(snap.val() || {});
+/* ---------- Students ---------- */
+let tenthStudents=[];
+db.ref("students/10").once("value",s=>{
+ tenthStudents = Object.values(s.val()||{});
 });
 
-/* ================= GLOBAL STATE ================= */
-let editingKey = null;
+/* ---------- State ---------- */
+let editingKey=null;
 
-/* ================= HELPERS ================= */
+/* ---------- Helpers ---------- */
 function parseSubjects(){
- let arr = subjects.value.split(",").map(s=>s.trim()).filter(Boolean);
+ let arr=subjects.value.split(",").map(s=>s.trim()).filter(Boolean);
  return {
-  subNames: arr.map(x=>x.split(":")[0]),
-  passMarks: arr.map(x=>Number(x.split(":")[1]))
+  subNames:arr.map(x=>x.split(":")[0]),
+  passMarks:arr.map(x=>Number(x.split(":")[1]))
  };
 }
 
-/* ================= CREATE MODE ================= */
+/* ---------- Create ---------- */
 function loadStudents(){
- if(editingKey !== null){
-   alert("You are editing a test. Marks already loaded.");
-   return;
+ if(editingKey!==null){
+  alert("Finish editing first");
+  return;
  }
 
- let {subNames} = parseSubjects();
- if(!subNames.length){ alert("Enter subjects"); return; }
+ let {subNames}=parseSubjects();
+ if(!subNames.length){alert("Enter subjects");return;}
 
- let html = "<h4>Enter Marks</h4>";
+ let html="<h4>Enter Marks</h4>";
  tenthStudents.forEach((stu,i)=>{
-   html += `<b>${stu.name} (${stu.roll})</b><br>`;
-   subNames.forEach((_,j)=>{
-     html += `<input id="m${i}_${j}" size="4"><br>`;
-   });
-   html += "<hr>";
+  html+=`<b>${stu.name} (${stu.roll})</b><br>`;
+  subNames.forEach((_,j)=>{
+   html+=`<input id="m${i}_${j}" size="4"><br>`;
+  });
+  html+="<hr>";
  });
- html += `<button onclick="saveTest()">Save Test</button>`;
- marksBox.innerHTML = html;
+ html+=`<button onclick="saveTest()">Save Test</button>`;
+ marksBox.innerHTML=html;
 }
 
 function saveTest(){
- let {subNames, passMarks} = parseSubjects();
- let obj = {
-  testName: testName.value,
-  subjects: subNames,
+ let {subNames,passMarks}=parseSubjects();
+ let obj={
+  testName:testName.value,
+  subjects:subNames,
   passMarks,
-  releaseTime: new Date(resultTime.value).getTime(),
-  results: []
+  releaseTime:new Date(resultTime.value).getTime(),
+  results:[]
  };
 
  tenthStudents.forEach((stu,i)=>{
-   let marks=[];
-   subNames.forEach((_,j)=>{
-     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
-   });
-   obj.results.push({roll:stu.roll,name:stu.name,marks});
+  let marks=[];
+  subNames.forEach((_,j)=>{
+   marks.push(+document.getElementById(`m${i}_${j}`).value||0);
+  });
+  obj.results.push({roll:stu.roll,name:stu.name,marks});
  });
 
  db.ref("tests").push(obj);
@@ -134,69 +127,58 @@ function saveTest(){
  showBars();
 }
 
-/* ================= EDIT MODE ================= */
+/* ---------- Edit ---------- */
 function editTest(key){
- editingKey = key;
+ editingKey=key;
 
  db.ref("tests/"+key).once("value",snap=>{
-   let t = snap.val();
+  let t=snap.val();
 
-   testName.value = t.testName;
-   subjects.value = t.subjects.map(
-     (s,i)=>`${s}:${t.passMarks[i]}`
-   ).join(", ");
-   resultTime.value = new Date(t.releaseTime).toISOString().slice(0,16);
+  testName.value=t.testName;
+  subjects.value=t.subjects.map((s,i)=>`${s}:${t.passMarks[i]}`).join(", ");
+  resultTime.value=new Date(t.releaseTime).toISOString().slice(0,16);
 
-   let html = "<h4>Edit Marks</h4>";
-
-   tenthStudents.forEach((stu,i)=>{
-     let res = t.results.find(
-       r => String(r.roll) === String(stu.roll)
-     );
-
-     html += `<b>${stu.name} (${stu.roll})</b><br>`;
-     t.subjects.forEach((_,j)=>{
-       html += `
-       <input id="m${i}_${j}"
-              value="${res ? res.marks[j] : ""}"
-              size="4"><br>`;
-     });
-     html += "<hr>";
+  let html="<h4>Edit Marks</h4>";
+  tenthStudents.forEach((stu,i)=>{
+   let res=t.results.find(r=>String(r.roll)===String(stu.roll));
+   html+=`<b>${stu.name} (${stu.roll})</b><br>`;
+   t.subjects.forEach((_,j)=>{
+    html+=`<input id="m${i}_${j}" value="${res?res.marks[j]:""}" size="4"><br>`;
    });
+   html+="<hr>";
+  });
 
-   html += `<button onclick="updateTest()">Save Changes</button>`;
-   marksBox.innerHTML = html;
+  html+=`<button onclick="updateTest()">Save Changes</button>`;
+  marksBox.innerHTML=html;
  });
 }
 
 function updateTest(){
- let {subNames, passMarks} = parseSubjects();
-
- let obj = {
-  testName: testName.value,
-  subjects: subNames,
+ let {subNames,passMarks}=parseSubjects();
+ let obj={
+  testName:testName.value,
+  subjects:subNames,
   passMarks,
-  releaseTime: new Date(resultTime.value).getTime(),
-  results: []
+  releaseTime:new Date(resultTime.value).getTime(),
+  results:[]
  };
 
  tenthStudents.forEach((stu,i)=>{
-   let marks=[];
-   subNames.forEach((_,j)=>{
-     marks.push(Number(document.getElementById(`m${i}_${j}`).value||0));
-   });
-   obj.results.push({roll:stu.roll,name:stu.name,marks});
+  let marks=[];
+  subNames.forEach((_,j)=>{
+   marks.push(+document.getElementById(`m${i}_${j}`).value||0);
+  });
+  obj.results.push({roll:stu.roll,name:stu.name,marks});
  });
 
  db.ref("tests/"+editingKey).set(obj);
- alert("Changes Saved");
-
- editingKey = null;
+ alert("Updated");
+ editingKey=null;
  marksBox.innerHTML="";
  showBars();
 }
 
-/* ================= DELETE ================= */
+/* ---------- Delete ---------- */
 function deleteTest(key){
  if(confirm("Delete test?")){
   db.ref("tests/"+key).remove();
@@ -204,58 +186,64 @@ function deleteTest(key){
  }
 }
 
-/* ================= LIST ================= */
+/* ---------- List ---------- */
 function showBars(){
  testBars.innerHTML="<h3>Available Tests</h3>";
  testSelect.innerHTML='<option value="">-- Select Test --</option>';
 
  db.ref("tests").once("value",snap=>{
-   let data = snap.val();
-   if(!data) return;
+  let data=snap.val();
+  if(!data) return;
 
-   Object.keys(data).forEach(k=>{
-     let t = data[k];
-     testBars.innerHTML += `
-     <div class="bar" onclick="openStudentResult('${k}')">
-      <span>${t.testName}</span>
-      ${isAdmin?`
-      <span>
-       <button class="smallbtn" onclick="event.stopPropagation();editTest('${k}')">✏</button>
-       <button class="smallbtn" onclick="event.stopPropagation();downloadTestPDF('${k}')">📄</button>
-       <button onclick="event.stopPropagation();deleteTest('${k}')">❌</button>
-      </span>`:""}
-     </div>`;
-     testSelect.innerHTML += `<option value="${k}">${t.testName}</option>`;
-   });
+  Object.keys(data).forEach(k=>{
+   let t=data[k];
+
+   let div=document.createElement("div");
+   div.className="bar";
+
+   div.innerHTML=`
+    <span>${t.testName}</span>
+    <span>
+     <button class="smallbtn" onclick="openStudentResult('${k}')">👁 View</button>
+     ${isAdmin?`
+     <button class="smallbtn" onclick="editTest('${k}')">✏ Edit</button>
+     <button class="smallbtn" onclick="downloadTestPDF('${k}')">📄 PDF</button>
+     <button onclick="deleteTest('${k}')">❌</button>`:""}
+    </span>
+   `;
+   testBars.appendChild(div);
+   testSelect.innerHTML+=`<option value="${k}">${t.testName}</option>`;
+  });
  });
 }
 showBars();
 
-/* ================= STUDENT PAGE ================= */
+/* ---------- Student ---------- */
 function openStudentResult(key){
  localStorage.setItem("selectedTestKey",key);
  location.href="services.html";
 }
 
-/* ================= PDF (unchanged) ================= */
+/* ---------- PDF ---------- */
 function downloadTestPDF(key){
- const {jsPDF} = window.jspdf;
- const doc = new jsPDF("l","mm","a4");
+ const {jsPDF}=window.jspdf;
+ const doc=new jsPDF("l","mm","a4");
+
  db.ref("tests/"+key).once("value",snap=>{
-   let t = snap.val(), y=30;
-   doc.text("RBS INSTITUTIONS",148,15,{align:"center"});
-   t.results.forEach((r,i)=>{
-     doc.text(`${i+1}. ${r.roll} ${r.name} Total:${r.marks.reduce((a,b)=>a+b,0)}`,20,y);
-     y+=8;
-     if(y>190){doc.addPage();y=20;}
-   });
-   doc.save(t.testName+"_Marks.pdf");
+  let t=snap.val();
+  let y=30;
+  doc.text("RBS INSTITUTIONS",148,15,{align:"center"});
+  t.results.forEach((r,i)=>{
+   doc.text(`${i+1}. ${r.roll} ${r.name}  Total:${r.marks.reduce((a,b)=>a+b,0)}`,20,y);
+   y+=8;
+   if(y>190){doc.addPage();y=20;}
+  });
+  doc.save(t.testName+"_Marks.pdf");
  });
 }
 
-/* ================= PROGRESS REPORT (unchanged) ================= */
 function downloadAllProgressReports(){
- alert("Progress report logic already works (unchanged).");
+ alert("Progress report logic unchanged");
 }
 </script>
 
